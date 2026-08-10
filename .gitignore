@@ -1,0 +1,7 @@
+system_info.txt
+logs/
+outputs/
+models/
+input/
+__pycache__/
+*.pyc
