@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -9,17 +10,60 @@ banner
 
 log_info "Checking Python..."
 
-require_command python3
+########################################
+# Python 3.11 is required
+########################################
 
-PYTHON_VERSION="$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')"
-
-log_info "Python ${PYTHON_VERSION} detected."
-
-if ! python3 -m venv --help >/dev/null 2>&1; then
-    log_error "Python venv support is not installed."
+if ! command -v python3.11 >/dev/null 2>&1; then
+    log_error "Python 3.11 is required but was not found."
+    log_error "The selected Pod image must provide python3.11."
     exit 1
 fi
 
-log_success "Python venv support available."
+PYTHON_VERSION="$(
+    python3.11 -c \
+    'import sys; print(".".join(map(str, sys.version_info[:3])))'
+)"
 
+PYTHON_MAJOR_MINOR="$(
+    python3.11 -c \
+    'import sys; print(".".join(map(str, sys.version_info[:2])))'
+)"
+
+if [[ "$PYTHON_MAJOR_MINOR" != "3.11" ]]; then
+    log_error "Wrong Python version detected: $PYTHON_VERSION"
+    log_error "Python 3.11 is required."
+    exit 1
+fi
+
+log_success "Python $PYTHON_VERSION detected."
+
+########################################
+# venv support
+########################################
+
+if ! python3.11 -m venv --help >/dev/null 2>&1; then
+    log_error "Python 3.11 venv support is not installed."
+    exit 1
+fi
+
+log_success "Python 3.11 venv support available."
+
+########################################
+# pip
+########################################
+
+if ! python3.11 -m pip --version >/dev/null 2>&1; then
+    log_error "pip is not available for Python 3.11."
+    exit 1
+fi
+
+log_success "Python 3.11 pip available."
+
+echo
 log_success "Python environment check complete."
+echo "Python: $(python3.11 --version)"
+echo
+EOF
+
+chmod +x install/python.sh
