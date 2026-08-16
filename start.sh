@@ -10,6 +10,10 @@ PORT="${COMFY_PORT:-8888}"
 
 banner
 
+########################################
+# Basic checks
+########################################
+
 if [[ ! -d "$COMFY_DIR" ]]; then
     log_error "ComfyUI not found at $COMFY_DIR"
     log_error "Run ./bootstrap.sh first."
@@ -20,30 +24,31 @@ PYTHON="$COMFY_DIR/venv/bin/python"
 
 if [[ ! -x "$PYTHON" ]]; then
     log_error "ComfyUI Python environment not found."
+    log_error "Run ./bootstrap.sh first."
     exit 1
 fi
 
-log_info "Checking GPU before starting ComfyUI..."
+########################################
+# Full environment verification
+########################################
 
-"$PYTHON" - <<'PY'
-import torch
+log_info "Running full environment verification..."
+echo
 
-if not torch.cuda.is_available():
-    raise SystemExit("CUDA is not available.")
+"$SCRIPT_DIR/install/verify.sh"
 
-gpu = torch.cuda.get_device_name(0)
-vram = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+echo
+log_success "Environment verification passed."
 
-print(f"GPU: {gpu}")
-print(f"VRAM: {vram:.1f} GB")
-print(f"PyTorch: {torch.__version__}")
-print(f"CUDA: {torch.version.cuda}")
-PY
+########################################
+# Start ComfyUI
+########################################
 
 echo
 log_info "Starting ComfyUI..."
-log_info "Listening on 0.0.0.0:${PORT}"
-log_info "SSH tunnel target: 127.0.0.1:${PORT}"
+log_info "ComfyUI directory: $COMFY_DIR"
+log_info "Listening on:      0.0.0.0:${PORT}"
+log_info "RunPod proxy port: ${PORT}"
 echo
 
 cd "$COMFY_DIR"
