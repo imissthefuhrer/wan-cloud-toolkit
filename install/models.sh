@@ -15,13 +15,16 @@ LORA_DIR="$MODEL_ROOT/loras"
 
 REMIX_URL="https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW"
 UMT5_URL="https://huggingface.co/NSFW-API/NSFW-Wan-UMT5-XXL/resolve/main"
+LIGHTNING_URL="https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/LoRAs/Wan22-Lightning/old"
+VAE_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 
 banner
 
 mkdir -p \
     "$DIFFUSION_DIR" \
     "$VAE_DIR" \
-    "$TEXT_ENCODER_DIR"     "$LORA_DIR"
+    "$TEXT_ENCODER_DIR" \
+    "$LORA_DIR"
 
 download_model() {
     local url="$1"
@@ -33,6 +36,8 @@ download_model() {
     fi
 
     log_info "Downloading: $(basename "$destination")"
+
+    rm -f "$destination"
 
     wget \
         --continue \
@@ -73,17 +78,17 @@ download_model \
 # Wan 2.2 Lightning I2V LoRAs
 ########################################
 
-LIGHTNING_URL="https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan22-Lightning"
+download_model \
+    "$LIGHTNING_URL/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors" \
+    "$LORA_DIR/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors"
 
-download_model     "$LIGHTNING_URL/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors"     "$LORA_DIR/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors"
-
-download_model     "$LIGHTNING_URL/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors"     "$LORA_DIR/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors"
+download_model \
+    "$LIGHTNING_URL/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors" \
+    "$LORA_DIR/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors"
 
 ########################################
 # Wan VAE
 ########################################
-
-VAE_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 
 download_model \
     "$VAE_URL" \
