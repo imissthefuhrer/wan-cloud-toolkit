@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -8,15 +7,14 @@ source "$SCRIPT_DIR/../lib/common.sh"
 
 banner
 
+########################################
+# Python version
+########################################
+
 log_info "Checking Python..."
 
-########################################
-# Python 3.11 is required
-########################################
-
 if ! command -v python3.11 >/dev/null 2>&1; then
-    log_error "Python 3.11 is required but was not found."
-    log_error "The selected Pod image must provide python3.11."
+    log_error "Python 3.11 is not installed."
     exit 1
 fi
 
@@ -64,6 +62,3 @@ echo
 log_success "Python environment check complete."
 echo "Python: $(python3.11 --version)"
 echo
-EOF
-
-chmod +x install/python.sh
