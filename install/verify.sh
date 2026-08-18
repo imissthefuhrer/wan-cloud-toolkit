@@ -1,6 +1,3 @@
-cd ~/Projects/wan-cloud-toolkit
-
-cat > install/verify.sh <<'EOF'
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -218,6 +215,8 @@ PY
         check_fail "PyTorch/CUDA verification failed."
     fi
 
+else
+    check_fail "ComfyUI Python executable not found."
 fi
 
 ########################################
@@ -373,6 +372,3 @@ else
     exit 1
 
 fi
-EOF
-
-chmod +x install/verify.sh
