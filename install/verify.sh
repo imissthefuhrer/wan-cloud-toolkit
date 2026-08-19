@@ -228,7 +228,7 @@ log_info "Checking pinned custom nodes..."
 
 declare -A EXPECTED_NODES=(
     ["ComfyUI-WanVideoWrapper"]="e926f7a0"
-    ["ComfyUI-KJNodes"]="89dc2f8"
+    ["ComfyUI-KJNodes"]="ffd4d1c908af896ed720d2edcd5cd151e5a06e70"
     ["ComfyUI-Easy-Use"]="a1b402b"
     ["ComfyUI-Custom-Scripts"]="aac13aa7ce35b07d43633c3bbe654a38c00d74f5"
     ["ComfyUI-Frame-Interpolation"]="a969c01dbccd9e5510641be04eb51fe93f6bfc3d"

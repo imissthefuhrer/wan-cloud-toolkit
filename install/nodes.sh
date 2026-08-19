@@ -61,7 +61,7 @@ install_node_repo \
 install_node_repo \
     "ComfyUI-KJNodes" \
     "https://github.com/kijai/ComfyUI-KJNodes.git" \
-    "89dc2f8"
+    "ffd4d1c908af896ed720d2edcd5cd151e5a06e70"
 
 install_node_repo \
     "ComfyUI-Easy-Use" \
