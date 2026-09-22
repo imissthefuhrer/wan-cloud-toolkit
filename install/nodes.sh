@@ -104,6 +104,22 @@ install_requirements "ComfyUI-Custom-Scripts"
 install_requirements "ComfyUI-Frame-Interpolation"
 
 ########################################
+# SageAttention
+########################################
+
+log_info "Installing SageAttention..."
+
+"$PYTHON" -m pip install \
+    "sageattention==1.0.6"
+
+if "$PYTHON" -c "from sageattention import sageattn" >/dev/null 2>&1; then
+    log_success "SageAttention installed and import verified."
+else
+    log_error "SageAttention installation failed."
+    exit 1
+fi
+
+########################################
 # RIFE 4.7 model
 ########################################
 

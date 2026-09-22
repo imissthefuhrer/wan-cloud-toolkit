@@ -431,7 +431,7 @@
       },
       "widgets_values": [
         "Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors",
-        "fp16_fast",
+        "fp16",
         "disabled",
         "offload_device",
         "sageattn",
@@ -527,7 +527,7 @@
       },
       "widgets_values": [
         "Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors",
-        "fp16_fast",
+        "fp16",
         "disabled",
         "offload_device",
         "sageattn",

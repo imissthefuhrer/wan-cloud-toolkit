@@ -220,6 +220,25 @@ else
 fi
 
 ########################################
+# SageAttention
+########################################
+
+echo
+log_info "Checking SageAttention..."
+
+if [[ -x "$PYTHON" ]]; then
+
+    if "$PYTHON" -c "from sageattention import sageattn" >/dev/null 2>&1; then
+        check_pass "SageAttention import verified."
+    else
+        check_fail "SageAttention is not installed or cannot be imported."
+    fi
+
+else
+    check_fail "Cannot check SageAttention: ComfyUI Python executable not found."
+fi
+
+########################################
 # Custom nodes
 ########################################
 
@@ -356,6 +375,7 @@ if [[ "$FAILURES" -eq 0 ]]; then
     echo
     echo "All pinned custom nodes verified."
     echo "All required models verified."
+    echo "SageAttention verified."
     echo
 
 else
