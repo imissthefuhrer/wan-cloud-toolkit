@@ -42,6 +42,7 @@ log_success "Ubuntu detected."
 ########################################
 
 PACKAGES=(
+    ca-certificates
     git
     wget
     curl
@@ -75,5 +76,33 @@ for pkg in "${PACKAGES[@]}"; do
     fi
 
 done
+
+# Ubuntu's default python3 is not necessarily 3.11. Preserve an existing
+# template-supplied 3.11 if it can create a complete virtual environment.
+if ! command -v python3.11 >/dev/null 2>&1 || \
+   ! python3.11 -c 'import venv, ensurepip' >/dev/null 2>&1; then
+    NEED_PPA=false
+    for package in python3.11 python3.11-venv; do
+        if ! apt-cache policy "$package" | grep -Eq 'Candidate: [0-9]'; then
+            NEED_PPA=true
+        fi
+    done
+    if [[ "$NEED_PPA" == true ]]; then
+        # Deadsnakes publishes signed Python packages for these Ubuntu releases.
+        # Do not silently configure an unsupported distribution.
+        . /etc/os-release
+        case "$VERSION_ID" in
+            22.04|24.04) ;;
+            *)
+                log_error "Python 3.11 packages unavailable for Ubuntu $VERSION_ID. Use a RunPod template providing Python 3.11 and venv support."
+                exit 1
+                ;;
+        esac
+        "${APT_PREFIX[@]}" apt-get install -y software-properties-common
+        "${APT_PREFIX[@]}" add-apt-repository -y ppa:deadsnakes/ppa
+        "${APT_PREFIX[@]}" apt-get update
+    fi
+    "${APT_PREFIX[@]}" apt-get install -y python3.11 python3.11-venv
+fi
 
 log_success "System packages complete."

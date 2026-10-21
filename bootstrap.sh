@@ -82,7 +82,8 @@ if [[ "$WITH_MODELS" == true ]]; then
     log_info "Step 6/6: Verification"
     "$SCRIPT_DIR/install/verify.sh"
 else
-    log_info "Step 6/6: Verification skipped because models were not requested."
+    log_info "Step 6/6: Basic installation verification"
+    "$SCRIPT_DIR/install/verify.sh" --basic
 fi
 
 echo

@@ -21,6 +21,14 @@ if [[ ! -x "$PYTHON" ]]; then
     exit 1
 fi
 
+# Inherited by every pip invocation, including any subprocess installers.
+CONSTRAINTS_FILE="$COMFY_DIR/wan-cloud-constraints.txt"
+if [[ ! -f "$CONSTRAINTS_FILE" ]]; then
+    log_error "Missing Torch constraints; run install/comfyui.sh first."
+    exit 1
+fi
+export PIP_CONSTRAINT="$CONSTRAINTS_FILE"
+
 mkdir -p "$CUSTOM_NODES"
 
 ########################################
@@ -101,7 +109,27 @@ install_requirements "ComfyUI-WanVideoWrapper"
 install_requirements "ComfyUI-KJNodes"
 install_requirements "ComfyUI-Easy-Use"
 install_requirements "ComfyUI-Custom-Scripts"
-install_requirements "ComfyUI-Frame-Interpolation"
+# This pinned node has no requirements.txt. Its install.py uses unchecked
+# os.system calls and CUDA autodetection incompatible with some split CUDA
+# wheel layouts, so install its declared requirements and backend explicitly.
+VFI_DIR="$CUSTOM_NODES/ComfyUI-Frame-Interpolation"
+"$PYTHON" -m pip install -r "$VFI_DIR/requirements-no-cupy.txt"
+VFI_BACKEND="$("$PYTHON" - "$VFI_DIR/config.yaml" <<'PYTHON'
+import sys, yaml
+with open(sys.argv[1]) as f:
+    print(yaml.safe_load(f)["ops_backend"])
+PYTHON
+)"
+case "$VFI_BACKEND" in
+    cupy)
+        "$PYTHON" -m pip install cupy-cuda12x
+        "$PYTHON" -c 'import cupy; assert cupy.arange(3).sum().item() == 3'
+        ;;
+    taichi)
+        "$PYTHON" -m pip install taichi
+        ;;
+    *) log_error "Unsupported VFI backend: $VFI_BACKEND"; exit 1 ;;
+esac
 
 ########################################
 # SageAttention
@@ -123,34 +151,40 @@ fi
 # RIFE 4.7 model
 ########################################
 
-VFI_MODELS="$CUSTOM_NODES/ComfyUI-Frame-Interpolation/models"
-mkdir -p "$VFI_MODELS"
+# Honor the node's configured checkpoint root (default: ckpts/rife).
+RIFE_MODEL="$("$PYTHON" - "$VFI_DIR" <<'PYTHON'
+import os, sys, yaml
+root = sys.argv[1]
+with open(os.path.join(root, "config.yaml")) as f:
+    config = yaml.safe_load(f)
+print(os.path.abspath(os.path.join(root, config["ckpts_path"], "rife", "rife47.pth")))
+PYTHON
+)"
+download_model \
+    "https://huggingface.co/marduk191/rife/resolve/main/rife47.pth" \
+    "$RIFE_MODEL"
 
-RIFE_MODEL="$VFI_MODELS/rife47.pth"
-
-if [[ -s "$RIFE_MODEL" ]]; then
-
-    log_success "rife47.pth already exists."
-
-else
-
-    log_info "Downloading RIFE 4.7 model..."
-
-    wget \
-        --continue \
-        --show-progress \
-        -O "$RIFE_MODEL" \
-        "https://huggingface.co/marduk191/rife/resolve/main/rife47.pth"
-
-    if [[ ! -s "$RIFE_MODEL" ]]; then
-        log_error "RIFE model download failed."
-        rm -f "$RIFE_MODEL"
-        exit 1
-    fi
-
-    log_success "RIFE 4.7 model installed."
-
-fi
+"$PYTHON" -m pip check
+# Verify the exact stack again after every custom-node dependency was installed.
+"$PYTHON" - <<'PYTHON'
+import torch, torchvision, torchaudio
+assert torch.__version__ == "2.4.1+cu124", torch.__version__
+assert torchvision.__version__ == "0.19.1+cu124", torchvision.__version__
+assert torchaudio.__version__ == "2.4.1+cu124", torchaudio.__version__
+assert torch.version.cuda == "12.4", torch.version.cuda
+assert torch.cuda.is_available(), "CUDA unavailable"
+PYTHON
+# Import the actual interpolation node with ComfyUI on sys.path.
+(cd "$COMFY_DIR" && "$PYTHON" - "$VFI_DIR" <<'PYTHON'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("wan_vfi_check", sys.argv[1] + "/__init__.py",
+                                            submodule_search_locations=[sys.argv[1]])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+assert "RIFE VFI" in module.NODE_CLASS_MAPPINGS
+PYTHON
+)
 
 ########################################
 # Summary

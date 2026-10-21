@@ -8,6 +8,19 @@ source "$SCRIPT_DIR/lib/common.sh"
 COMFY_DIR="${COMFY_DIR:-/workspace/ComfyUI}"
 PORT="${COMFY_PORT:-8888}"
 
+# Model downloads are optional for launching the UI. Use --full to require
+# all Wan workflow assets before starting.
+VERIFY_ARGS=(--basic)
+case "${1:-}" in
+    "") ;;
+    --full) VERIFY_ARGS=() ;;
+    *) log_error "Usage: $0 [--full]"; exit 1 ;;
+esac
+if [[ $# -gt 1 ]]; then
+    log_error "Usage: $0 [--full]"
+    exit 1
+fi
+
 banner
 
 ########################################
@@ -29,13 +42,13 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 ########################################
-# Full environment verification
+# Installation verification
 ########################################
 
-log_info "Running full environment verification..."
+log_info "Running installation verification..."
 echo
 
-"$SCRIPT_DIR/install/verify.sh"
+"$SCRIPT_DIR/install/verify.sh" "${VERIFY_ARGS[@]}"
 
 echo
 log_success "Environment verification passed."

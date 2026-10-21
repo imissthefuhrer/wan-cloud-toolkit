@@ -9,6 +9,19 @@ COMFY_DIR="${COMFY_DIR:-/workspace/ComfyUI}"
 PYTHON="$COMFY_DIR/venv/bin/python"
 CUSTOM_NODES="$COMFY_DIR/custom_nodes"
 
+# Full workflow verification is the default. --basic checks the installation
+# while allowing ComfyUI to start before the large workflow models are present.
+CHECK_MODELS=true
+case "${1:-}" in
+    "") ;;
+    --basic) CHECK_MODELS=false ;;
+    *) log_error "Usage: $0 [--basic]"; exit 1 ;;
+esac
+if [[ $# -gt 1 ]]; then
+    log_error "Usage: $0 [--basic]"
+    exit 1
+fi
+
 EXPECTED_COMFY_COMMIT="9a470e073e2742d4edd6e7ea1ce28d861a77d9c4"
 
 banner
@@ -127,9 +140,11 @@ log_info "Checking NVIDIA GPU..."
 
 if command -v nvidia-smi >/dev/null 2>&1; then
 
-    nvidia-smi \
+    if ! nvidia-smi \
         --query-gpu=name,memory.total,driver_version \
-        --format=csv,noheader
+        --format=csv,noheader; then
+        check_fail "NVIDIA driver/GPU query failed."
+    fi
 
 else
     check_fail "nvidia-smi unavailable."
@@ -219,6 +234,14 @@ else
     check_fail "ComfyUI Python executable not found."
 fi
 
+if [[ -x "$PYTHON" ]]; then
+    if "$PYTHON" -m pip check; then
+        check_pass "Python dependencies consistent."
+    else
+        check_fail "Python dependency conflicts detected."
+    fi
+fi
+
 ########################################
 # SageAttention
 ########################################
@@ -285,36 +308,55 @@ done
 # Model files
 ########################################
 
-echo
-log_info "Checking Option B model files..."
-
-REQUIRED_MODELS=(
-    "$COMFY_DIR/models/diffusion_models/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors"
-    "$COMFY_DIR/models/diffusion_models/Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors"
-    "$COMFY_DIR/models/text_encoders/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
-    "$COMFY_DIR/models/loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors"
-    "$COMFY_DIR/models/loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors"
-    "$COMFY_DIR/models/vae/wan_2.1_vae.safetensors"
-    "$CUSTOM_NODES/ComfyUI-Frame-Interpolation/models/rife47.pth"
-)
-
-for model in "${REQUIRED_MODELS[@]}"; do
-
-    if [[ -s "$model" ]]; then
-
-        size="$(
-            du -h "$model" | cut -f1
-        )"
-
-        check_pass "$(basename "$model") [$size]"
-
+if [[ "$CHECK_MODELS" == true ]]; then
+    RIFE_MODEL=""
+    if [[ -x "$PYTHON" && -f "$CUSTOM_NODES/ComfyUI-Frame-Interpolation/config.yaml" ]]; then
+        if ! RIFE_MODEL="$("$PYTHON" - "$CUSTOM_NODES/ComfyUI-Frame-Interpolation" <<'PYTHON'
+import os, sys, yaml
+root = sys.argv[1]
+with open(os.path.join(root, "config.yaml")) as f:
+    config = yaml.safe_load(f)
+print(os.path.abspath(os.path.join(root, config["ckpts_path"], "rife", "rife47.pth")))
+PYTHON
+    )"; then
+            check_fail "Could not resolve the configured RIFE checkpoint path."
+        fi
     else
-
-        check_fail "Missing model: $model"
-
+        check_fail "Cannot resolve RIFE checkpoint: Python or node configuration missing."
     fi
+    echo
+    log_info "Checking Option B model files..."
 
-done
+    REQUIRED_MODELS=(
+        "$COMFY_DIR/models/diffusion_models/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors"
+        "$COMFY_DIR/models/diffusion_models/Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors"
+        "$COMFY_DIR/models/text_encoders/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+        "$COMFY_DIR/models/loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_HIGH_fp16.safetensors"
+        "$COMFY_DIR/models/loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors"
+        "$COMFY_DIR/models/vae/wan_2.1_vae.safetensors"
+        "$RIFE_MODEL"
+    )
+
+    for model in "${REQUIRED_MODELS[@]}"; do
+
+        if [[ -s "$model" ]]; then
+
+            size="$(
+                du -h "$model" | cut -f1
+            )"
+
+            check_pass "$(basename "$model") [$size]"
+
+        else
+
+            check_fail "Missing model: $model"
+
+        fi
+
+    done
+else
+    log_info "Workflow model checks skipped (--basic)."
+fi
 
 ########################################
 # PyTorch constraint file
@@ -374,7 +416,11 @@ if [[ "$FAILURES" -eq 0 ]]; then
     echo "  Pipeline:      Wan 2.2 Remix I2V"
     echo
     echo "All pinned custom nodes verified."
-    echo "All required models verified."
+    if [[ "$CHECK_MODELS" == true ]]; then
+        echo "All required model files present (presence check only)."
+    else
+        echo "Basic installation verified; workflow models were not checked."
+    fi
     echo "SageAttention verified."
     echo
 

@@ -26,34 +26,6 @@ mkdir -p \
     "$TEXT_ENCODER_DIR" \
     "$LORA_DIR"
 
-download_model() {
-    local url="$1"
-    local destination="$2"
-
-    if [[ -s "$destination" ]]; then
-        log_success "Already exists: $(basename "$destination")"
-        return 0
-    fi
-
-    log_info "Downloading: $(basename "$destination")"
-
-    rm -f "$destination"
-
-    wget \
-        --continue \
-        --show-progress \
-        -O "$destination" \
-        "$url"
-
-    if [[ ! -s "$destination" ]]; then
-        log_error "Download failed: $destination"
-        rm -f "$destination"
-        exit 1
-    fi
-
-    log_success "Downloaded: $(basename "$destination")"
-}
-
 ########################################
 # Wan 2.2 Remix NSFW I2V 14B
 ########################################
