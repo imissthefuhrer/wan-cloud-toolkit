@@ -153,9 +153,9 @@ log_info "Installing pinned PyTorch CUDA 12.4 stack..."
 
 "$PYTHON" -m pip install \
     --index-url "$PYTORCH_INDEX" \
-    "torch==${PYTORCH_VERSION}" \
-    "torchvision==${TORCHVISION_VERSION}" \
-    "torchaudio==${TORCHAUDIO_VERSION}"
+    "torch==${PYTORCH_VERSION}+cu124" \
+    "torchvision==${TORCHVISION_VERSION}+cu124" \
+    "torchaudio==${TORCHAUDIO_VERSION}+cu124"
 
 ########################################
 # Create dependency constraints
@@ -163,11 +163,8 @@ log_info "Installing pinned PyTorch CUDA 12.4 stack..."
 
 CONSTRAINTS_FILE="$COMFY_DIR/wan-cloud-constraints.txt"
 
-cat > "$CONSTRAINTS_FILE" <<CONSTRAINTS
-torch==${PYTORCH_VERSION}
-torchvision==${TORCHVISION_VERSION}
-torchaudio==${TORCHAUDIO_VERSION}
-CONSTRAINTS
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" capture "$CONSTRAINTS_FILE"
+export PIP_CONSTRAINT="$CONSTRAINTS_FILE"
 
 log_success "PyTorch constraints created."
 
@@ -188,6 +185,8 @@ log_info "Installing ComfyUI 0.3.45 requirements..."
 "$PYTHON" -m pip install \
     -r "$COMFY_DIR/requirements.txt" \
     -c "$CONSTRAINTS_FILE"
+
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
 
 ########################################
 # Verify PyTorch

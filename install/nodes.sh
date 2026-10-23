@@ -28,6 +28,7 @@ if [[ ! -f "$CONSTRAINTS_FILE" ]]; then
     exit 1
 fi
 export PIP_CONSTRAINT="$CONSTRAINTS_FILE"
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
 
 mkdir -p "$CUSTOM_NODES"
 
@@ -99,21 +100,15 @@ install_requirements() {
 
         "$PYTHON" -m pip install -r "$requirements"
 
+        "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
         log_success "$name requirements installed."
     else
         log_info "$name has no requirements.txt; skipping."
     fi
 }
 
-install_requirements "ComfyUI-WanVideoWrapper"
-install_requirements "ComfyUI-KJNodes"
-install_requirements "ComfyUI-Easy-Use"
-install_requirements "ComfyUI-Custom-Scripts"
-# This pinned node has no requirements.txt. Its install.py uses unchecked
-# os.system calls and CUDA autodetection incompatible with some split CUDA
-# wheel layouts, so install its declared requirements and backend explicitly.
+# Establish the configured backend before any other custom-node requirements.
 VFI_DIR="$CUSTOM_NODES/ComfyUI-Frame-Interpolation"
-"$PYTHON" -m pip install -r "$VFI_DIR/requirements-no-cupy.txt"
 VFI_BACKEND="$("$PYTHON" - "$VFI_DIR/config.yaml" <<'PYTHON'
 import sys, yaml
 with open(sys.argv[1]) as f:
@@ -122,14 +117,35 @@ PYTHON
 )"
 case "$VFI_BACKEND" in
     cupy)
-        "$PYTHON" -m pip install cupy-cuda12x
-        "$PYTHON" -c 'import cupy; assert cupy.arange(3).sum().item() == 3'
+        # CuPy 13.3 supports Python 3.11/CUDA 12.x; its metadata requires
+        # numpy>=1.22,<2.3. Install under the existing Torch/CUDA constraints.
+        "$PYTHON" -m pip install "cupy-cuda12x==13.3.0"
         ;;
-    taichi)
-        "$PYTHON" -m pip install taichi
-        ;;
+    taichi) "$PYTHON" -m pip install taichi ;;
     *) log_error "Unsupported VFI backend: $VFI_BACKEND"; exit 1 ;;
 esac
+# Preserve the original Torch/NVIDIA/Triton snapshot while adding CuPy.
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" capture "$CONSTRAINTS_FILE.next"
+"$PYTHON" - "$CONSTRAINTS_FILE" "$CONSTRAINTS_FILE.next" <<'PYTHON'
+import sys
+from pathlib import Path
+old = set(Path(sys.argv[1]).read_text().splitlines())
+new = set(Path(sys.argv[2]).read_text().splitlines())
+if not old <= new:
+    raise SystemExit("Backend installation changed the protected stack")
+PYTHON
+mv -- "$CONSTRAINTS_FILE.next" "$CONSTRAINTS_FILE"
+
+install_requirements "ComfyUI-WanVideoWrapper"
+install_requirements "ComfyUI-KJNodes"
+install_requirements "ComfyUI-Easy-Use"
+install_requirements "ComfyUI-Custom-Scripts"
+# Avoid the pinned node's unchecked install.py shell calls.
+"$PYTHON" -m pip install -r "$VFI_DIR/requirements-no-cupy.txt"
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
+if [[ "$VFI_BACKEND" == cupy ]]; then
+    "$PYTHON" -c 'import cupy; assert cupy.arange(3).sum().item() == 3'
+fi
 
 ########################################
 # SageAttention
@@ -160,10 +176,8 @@ with open(os.path.join(root, "config.yaml")) as f:
 print(os.path.abspath(os.path.join(root, config["ckpts_path"], "rife", "rife47.pth")))
 PYTHON
 )"
-download_model \
-    "https://huggingface.co/marduk191/rife/resolve/main/rife47.pth" \
-    "$RIFE_MODEL"
 
+"$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
 "$PYTHON" -m pip check
 # Verify the exact stack again after every custom-node dependency was installed.
 "$PYTHON" - <<'PYTHON'
@@ -185,6 +199,10 @@ spec.loader.exec_module(module)
 assert "RIFE VFI" in module.NODE_CLASS_MAPPINGS
 PYTHON
 )
+
+download_model \
+    "https://huggingface.co/marduk191/rife/resolve/main/rife47.pth" \
+    "$RIFE_MODEL"
 
 ########################################
 # Summary

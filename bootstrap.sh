@@ -56,23 +56,19 @@ log_info "Step 3/6: ComfyUI"
 "$SCRIPT_DIR/install/comfyui.sh"
 
 ########################################
-# Models
+# Nodes and inexpensive verification before large Wan model downloads
 ########################################
 
+log_info "Step 4/6: Custom nodes and compatibility checks"
+"$SCRIPT_DIR/install/nodes.sh"
+"$SCRIPT_DIR/install/verify.sh" --basic
+
+log_info "Step 5/6: Wan 2.2 models"
 if [[ "$WITH_MODELS" == true ]]; then
-    log_info "Step 4/6: Wan 2.2 models"
     "$SCRIPT_DIR/install/models.sh"
 else
-    log_warn "Step 4/6: Model installation skipped."
-    log_warn "Run with --with-models to download Wan 2.2 models."
+    log_warn "Model installation skipped; use --with-models to download Wan assets."
 fi
-
-########################################
-# Nodes
-########################################
-
-log_info "Step 5/6: Node check"
-"$SCRIPT_DIR/install/nodes.sh"
 
 ########################################
 # Verification

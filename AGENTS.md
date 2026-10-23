@@ -18,9 +18,11 @@
 
 ## Repository map and protected stack
 
-- `bootstrap.sh`: system packages, Python, ComfyUI, optional Wan models, custom nodes/RIFE, then verification. Default bootstrap still downloads dependencies and the RIFE checkpoint; `--with-models` also downloads the large workflow assets.
+- `bootstrap.sh`: system packages, Python, ComfyUI, custom nodes/RIFE and basic verification, optional Wan models, then final verification. Default bootstrap still downloads dependencies and the RIFE checkpoint; `--with-models` also downloads the large workflow assets.
 - `install/comfyui.sh`: ComfyUI 0.3.45 at the pinned commit, Python 3.11 venv, Torch 2.4.1 / torchvision 0.19.1 / torchaudio 2.4.1 with CUDA 12.4 wheels, and `wan-cloud-constraints.txt`.
 - `install/nodes.sh`: pinned custom nodes, SageAttention 1.0.6, configured interpolation backend, and RIFE 4.7. Preserve the Torch constraints for any approved dependency repair.
+- `tools/protect_stack.py`: validates and snapshots the installed exact CUDA wheel stack (Torch, NVIDIA packages, Triton, and CuPy where installed). Never hand-edit or regenerate a snapshot to bless an unexplained change. Legacy three-package constraints must be replaced through an authorized, verified installation before running the node installer.
+- `tools/model_metadata.py URL`: HEAD-only redirect, final HTTP status, size, and SHA-256 metadata check. It does not download model bodies or expose signed artifact URLs.
 - `install/models.sh` and `lib/common.sh`: exact model filenames and downloads verified against Hugging Face LFS SHA-256 and size metadata. Preserve `.part` files for resumable downloads; do not bypass integrity checks.
 - `install/verify.sh --basic`: installed stack checks without requiring workflow models. `install/verify.sh` additionally checks model presence; it does not validate every model checksum or perform generation.
 - `start.sh`: basic verification followed by ComfyUI startup. `start.sh --full` requires workflow model presence first. Default target is `/workspace/ComfyUI`, default port is `8888`; export `COMFY_DIR` and `COMFY_PORT` explicitly when authorized values differ. Do not assume `config.env` is automatically sourced.

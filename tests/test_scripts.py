@@ -29,6 +29,9 @@ class Downloads(unittest.TestCase):
         self.interrupt = False
         self.corrupt = False
         self.metadata = True
+        self.redirect = False
+        self.final_status = 200
+        self.head_size = len(PAYLOAD)
         fixture = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -36,10 +39,20 @@ class Downloads(unittest.TestCase):
                 pass
 
             def do_HEAD(self):
-                self.send_response(200)
-                if fixture.metadata:
+                if fixture.redirect and self.path == "/model":
+                    self.send_response(307)
+                    self.send_header("Location", "/canonical")
+                    self.end_headers()
+                    return
+                if fixture.redirect and self.path == "/canonical":
+                    self.send_response(302)
+                    self.send_header("Location", "/artifact")
+                else:
+                    self.send_response(fixture.final_status)
+                if fixture.metadata and self.path != "/artifact":
                     self.send_header("X-Linked-Etag", '"' + hashlib.sha256(PAYLOAD).hexdigest() + '"')
                     self.send_header("X-Linked-Size", str(len(PAYLOAD)))
+                self.send_header("Content-Length", str(fixture.head_size))
                 self.end_headers()
 
             def do_GET(self):
@@ -80,6 +93,30 @@ class Downloads(unittest.TestCase):
     def assert_complete(self):
         self.assertEqual(self.destination.read_bytes(), PAYLOAD)
         self.assertFalse(Path(str(self.destination) + ".part").exists())
+
+    def inspect_metadata(self):
+        return subprocess.run(
+            ["python3", str(ROOT / "tools/model_metadata.py"),
+             f"http://127.0.0.1:{self.server.server_port}/model"],
+            capture_output=True, text=True, timeout=10)
+
+    def test_metadata_follows_307_and_302_without_get(self):
+        self.redirect = True
+        result = self.inspect_metadata()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), f"{hashlib.sha256(PAYLOAD).hexdigest()} {len(PAYLOAD)}")
+        self.assertEqual(self.ranges, [])
+
+    def test_metadata_rejects_final_error(self):
+        self.redirect = True
+        self.final_status = 403
+        self.assertNotEqual(self.inspect_metadata().returncode, 0)
+        self.assertEqual(self.ranges, [])
+
+    def test_metadata_rejects_length_mismatch(self):
+        self.head_size = len(PAYLOAD) + 1
+        self.assertNotEqual(self.inspect_metadata().returncode, 0)
+        self.assertEqual(self.ranges, [])
 
     def test_fresh_download_and_verified_rerun(self):
         self.assertEqual(self.download().returncode, 0)
@@ -131,6 +168,7 @@ class EntryPoints(unittest.TestCase):
         self.root = Path(self.tmp.name)
         (self.root / "lib").mkdir()
         shutil.copy(ROOT / "lib/common.sh", self.root / "lib/common.sh")
+        shutil.copytree(ROOT / "tools", self.root / "tools")
         self.log = self.root / "calls"
         self.comfy = self.root / "ComfyUI"
         self.env = {**os.environ, "COMFY_DIR": str(self.comfy), "CALL_LOG": str(self.log)}
@@ -147,14 +185,18 @@ class EntryPoints(unittest.TestCase):
                               capture_output=True, text=True, timeout=5)
 
     def test_default_bootstrap_checks_basic_installation(self):
-        self.assertEqual(self.run_script("bootstrap.sh").returncode, 0)
-        calls = self.log.read_text().splitlines()
-        self.assertEqual(calls, ["apt ", "python ", "comfyui ", "nodes ", "verify --basic"])
+        # Static ordering check: never execute bootstrap during preflight tests.
+        script = (ROOT / "bootstrap.sh").read_text()
+        calls = [script.index(f'"$SCRIPT_DIR/install/{name}.sh"')
+                 for name in ("apt", "python", "comfyui", "nodes", "verify", "models")]
+        self.assertEqual(calls, sorted(calls))
 
     def test_models_bootstrap_checks_full_workflow(self):
-        self.assertEqual(self.run_script("bootstrap.sh", "--with-models").returncode, 0)
-        calls = self.log.read_text().splitlines()
-        self.assertEqual(calls, ["apt ", "python ", "comfyui ", "models ", "nodes ", "verify "])
+        script = (ROOT / "bootstrap.sh").read_text()
+        self.assertIn('"$SCRIPT_DIR/install/verify.sh" --basic', script)
+        self.assertIn('if [[ "$WITH_MODELS" == true ]]; then', script)
+        self.assertGreater(script.rindex('"$SCRIPT_DIR/install/verify.sh"'),
+                           script.index('"$SCRIPT_DIR/install/models.sh"'))
 
     def test_start_modes(self):
         for args, verification in [((), "verify --basic"), (("--full",), "verify ")]:

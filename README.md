@@ -52,6 +52,28 @@ Upload an input image and load `workflows/Wan22-I2V-Remix.json` in ComfyUI. The 
 - Downloads remain in `.part` files until size and SHA-256 verification succeeds. Rerun a failed install to resume an interrupted transfer. Existing final files are also checked before being reused. Missing authoritative metadata causes a failure rather than accepting an unverified model.
 - Third-party Python dependencies are not fully locked. A future incompatible dependency release can still make resolution fail; constraints prevent silently replacing the required Torch stack.
 
+### Dependency and download safeguards
+
+The installer requests exact `+cu124` Torch wheels and captures the installed
+NVIDIA and Triton versions from that wheel environment into
+`wan-cloud-constraints.txt`. The capture validates installed package requirements;
+it does not copy CUDA 12.1 versions from the default PyPI Torch metadata.
+ComfyUI and custom-node dependency installations inherit these constraints.
+The configured CuPy backend uses `cupy-cuda12x==13.3.0` (Python 3.11 wheel,
+CUDA 12.x, NumPy `>=1.22,<2.3`), then adds its exact installed version to the
+snapshot. Conflicting CuPy distributions and changes to the protected package
+set fail verification. No CUDA driver or system toolkit version is changed.
+Other third-party dependencies remain unlocked and can still cause a resolver
+or runtime failure; the installer must stop rather than loosen constraints.
+
+Shared model metadata verification follows redirects using HEAD requests only,
+requires final HTTP 200, and compares final Content-Length with authoritative
+Hugging Face SHA-256/size metadata. Signed artifact URLs are not logged.
+Custom nodes and basic compatibility verification now precede the large Wan
+model downloads. RIFE is still downloaded by the node installer after its
+dependency checks. System prerequisites now include tmux; persistent session
+and log operation is documented in `AGENTS.md`.
+
 ## Local regression checks
 
 These checks need Python 3, Bash, curl, and wget, but no GPU or model downloads:

@@ -50,7 +50,7 @@ check_fail() {
 echo
 log_info "Checking required system commands..."
 
-for cmd in git python3.11 wget curl ffmpeg nvidia-smi; do
+for cmd in git python3.11 wget curl ffmpeg tmux nvidia-smi; do
     if command -v "$cmd" >/dev/null 2>&1; then
         check_pass "$cmd available."
     else
@@ -371,19 +371,19 @@ if [[ -f "$CONSTRAINTS_FILE" ]]; then
 
     check_pass "Constraint file found."
 
-    if grep -q '^torch==2\.4\.1$' "$CONSTRAINTS_FILE"; then
+    if grep -q '^torch==2\.4\.1+cu124$' "$CONSTRAINTS_FILE"; then
         check_pass "Torch constraint: 2.4.1"
     else
         check_fail "Torch constraint is incorrect."
     fi
 
-    if grep -q '^torchvision==0\.19\.1$' "$CONSTRAINTS_FILE"; then
+    if grep -q '^torchvision==0\.19\.1+cu124$' "$CONSTRAINTS_FILE"; then
         check_pass "Torchvision constraint: 0.19.1"
     else
         check_fail "Torchvision constraint is incorrect."
     fi
 
-    if grep -q '^torchaudio==2\.4\.1$' "$CONSTRAINTS_FILE"; then
+    if grep -q '^torchaudio==2\.4\.1+cu124$' "$CONSTRAINTS_FILE"; then
         check_pass "Torchaudio constraint: 2.4.1"
     else
         check_fail "Torchaudio constraint is incorrect."
@@ -393,6 +393,14 @@ else
 
     check_fail "PyTorch constraint file missing."
 
+fi
+
+if [[ -x "$PYTHON" && -f "$CONSTRAINTS_FILE" ]]; then
+    if "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"; then
+        check_pass "Protected CUDA dependency snapshot verified."
+    else
+        check_fail "Protected CUDA dependency snapshot mismatch."
+    fi
 fi
 
 ########################################

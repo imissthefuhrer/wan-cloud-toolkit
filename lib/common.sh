@@ -99,14 +99,11 @@ EOF
 # interrupted transfers under .part and publish only a verified complete file.
 download_model() {
     local url="$1" destination="$2"
-    local headers expected_sha expected_size partial="${2}.part"
-    headers="$(curl --fail --silent --show-error --head "$url")" || return 1
-    expected_sha="$(printf '%s\n' "$headers" | awk 'tolower($1) == "x-linked-etag:" {gsub(/["\r]/, "", $2); print $2}')"
-    expected_size="$(printf '%s\n' "$headers" | awk 'tolower($1) == "x-linked-size:" {gsub(/\r/, "", $2); print $2}')"
-    if [[ ! "$expected_sha" =~ ^[[:xdigit:]]{64}$ || ! "$expected_size" =~ ^[0-9]+$ ]]; then
-        log_error "Missing Hugging Face LFS SHA-256/size metadata: $url"
-        return 1
-    fi
+    local metadata expected_sha expected_size partial="${2}.part"
+    local toolkit_root
+    toolkit_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    metadata="$(python3 "$toolkit_root/tools/model_metadata.py" "$url")" || return 1
+    read -r expected_sha expected_size <<< "$metadata"
 
     if model_matches "$destination" "$expected_size" "$expected_sha"; then
         log_success "Verified existing model: $(basename "$destination")"

@@ -43,6 +43,7 @@ log_success "Ubuntu detected."
 
 PACKAGES=(
     ca-certificates
+    tmux
     git
     wget
     curl
