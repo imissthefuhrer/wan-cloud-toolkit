@@ -164,7 +164,7 @@ log_info "Installing pinned PyTorch CUDA 12.4 stack..."
 CONSTRAINTS_FILE="$COMFY_DIR/wan-cloud-constraints.txt"
 
 "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" capture "$CONSTRAINTS_FILE"
-export PIP_CONSTRAINT="$CONSTRAINTS_FILE"
+use_wan_constraints "$CONSTRAINTS_FILE"
 
 log_success "PyTorch constraints created."
 
@@ -184,7 +184,7 @@ log_info "Installing ComfyUI 0.3.45 requirements..."
 
 "$PYTHON" -m pip install \
     -r "$COMFY_DIR/requirements.txt" \
-    -c "$CONSTRAINTS_FILE"
+    -c "$PIP_CONSTRAINT"
 
 "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
 

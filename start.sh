@@ -45,6 +45,9 @@ fi
 # Installation verification
 ########################################
 
+python3 "$SCRIPT_DIR/tools/start_comfyui.py" --directory "$COMFY_DIR" --port "$PORT" --preflight
+"$PYTHON" "$SCRIPT_DIR/tools/check_diffusers.py"
+
 log_info "Running installation verification..."
 echo
 
@@ -64,8 +67,7 @@ log_info "Listening on:      0.0.0.0:${PORT}"
 log_info "RunPod proxy port: ${PORT}"
 echo
 
-cd "$COMFY_DIR"
-
-exec "$PYTHON" main.py \
-    --listen 0.0.0.0 \
-    --port "$PORT"
+exec python3 "$SCRIPT_DIR/tools/start_comfyui.py" \
+    --directory "$COMFY_DIR" --port "$PORT" \
+    --timeout "${COMFY_START_TIMEOUT:-120}" \
+    --log-dir "${COMFY_LOG_DIR:-/workspace/wan-cloud-logs}"

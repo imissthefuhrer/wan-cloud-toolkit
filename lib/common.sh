@@ -45,6 +45,16 @@ require_command() {
 
 }
 
+# Combine Python compatibility pins with the existing protected CUDA snapshot.
+# Never add non-CUDA pins to, or regenerate, the protected snapshot as a repair.
+use_wan_constraints() {
+    local protected="$1" root combined
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    combined="$(dirname "$protected")/wan-cloud-pip-constraints.txt"
+    (umask 077; cat "$protected" "$root/constraints/wan-python.txt" > "$combined")
+    export PIP_CONSTRAINT="$combined"
+}
+
 ########################################
 # Run command safely
 ########################################

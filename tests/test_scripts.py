@@ -169,6 +169,10 @@ class EntryPoints(unittest.TestCase):
         (self.root / "lib").mkdir()
         shutil.copy(ROOT / "lib/common.sh", self.root / "lib/common.sh")
         shutil.copytree(ROOT / "tools", self.root / "tools")
+        shutil.copytree(ROOT / "constraints", self.root / "constraints")
+        # Control-flow fixture only; actual supervisor/API behavior has its own tests.
+        (self.root / "tools/start_comfyui.py").write_text(
+            'import os,sys\nwith open(os.environ["CALL_LOG"],"a") as f: f.write("supervisor " + " ".join(sys.argv[1:]) + "\\n")\n')
         self.log = self.root / "calls"
         self.comfy = self.root / "ComfyUI"
         self.env = {**os.environ, "COMFY_DIR": str(self.comfy), "CALL_LOG": str(self.log)}
@@ -203,13 +207,17 @@ class EntryPoints(unittest.TestCase):
             with self.subTest(args=args):
                 self.log.unlink(missing_ok=True)
                 self.assertEqual(self.run_script("start.sh", *args).returncode, 0)
-                self.assertEqual(self.log.read_text().splitlines(),
-                                 [verification, "python main.py --listen 0.0.0.0 --port 8888"])
+                calls = self.log.read_text().splitlines()
+                self.assertIn("--port 8888 --preflight", calls[0])
+                self.assertIn("tools/check_diffusers.py", calls[1])
+                self.assertEqual(calls[2], verification)
+                self.assertIn("--port 8888 --timeout 120", calls[3])
 
     def test_verification_failure_prevents_start(self):
         executable(self.root / "install/verify.sh", "#!/bin/bash\nexit 9\n")
         self.assertEqual(self.run_script("start.sh").returncode, 9)
-        self.assertFalse(self.log.exists())
+        calls = self.log.read_text().splitlines()
+        self.assertEqual(len(calls), 2)  # Preflight and CPU import check; no startup.
 
     def test_unknown_start_option_rejected(self):
         self.assertNotEqual(self.run_script("start.sh", "--unknown").returncode, 0)

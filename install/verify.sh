@@ -407,6 +407,14 @@ fi
 # Final result
 ########################################
 
+if [[ -x "$PYTHON" ]]; then
+    if "$PYTHON" "$SCRIPT_DIR/../tools/check_diffusers.py"; then
+        check_pass "Pinned Python compatibility versions and wrapper diffusers imports verified."
+    else
+        check_fail "Python compatibility versions or wrapper diffusers imports failed."
+    fi
+fi
+
 echo
 
 if [[ "$FAILURES" -eq 0 ]]; then

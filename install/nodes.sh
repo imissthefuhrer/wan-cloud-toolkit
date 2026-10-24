@@ -27,8 +27,8 @@ if [[ ! -f "$CONSTRAINTS_FILE" ]]; then
     log_error "Missing Torch constraints; run install/comfyui.sh first."
     exit 1
 fi
-export PIP_CONSTRAINT="$CONSTRAINTS_FILE"
 "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
+use_wan_constraints "$CONSTRAINTS_FILE"
 
 mkdir -p "$CUSTOM_NODES"
 
@@ -135,6 +135,7 @@ if not old <= new:
     raise SystemExit("Backend installation changed the protected stack")
 PYTHON
 mv -- "$CONSTRAINTS_FILE.next" "$CONSTRAINTS_FILE"
+use_wan_constraints "$CONSTRAINTS_FILE"
 
 install_requirements "ComfyUI-WanVideoWrapper"
 install_requirements "ComfyUI-KJNodes"
@@ -179,6 +180,7 @@ PYTHON
 
 "$PYTHON" "$SCRIPT_DIR/../tools/protect_stack.py" check "$CONSTRAINTS_FILE"
 "$PYTHON" -m pip check
+"$PYTHON" "$SCRIPT_DIR/../tools/check_diffusers.py"
 # Verify the exact stack again after every custom-node dependency was installed.
 "$PYTHON" - <<'PYTHON'
 import torch, torchvision, torchaudio

@@ -1,0 +1,52 @@
+{
+  "repository": "https://github.com/kijai/ComfyUI-WanVideoWrapper",
+  "revision": "e926f7a069e3efc25bdcc78e1bf65c39ac1a2cd4",
+  "imports": {
+    "diffusers.configuration_utils": [
+      "ConfigMixin",
+      "register_to_config"
+    ],
+    "diffusers.loaders": [
+      "FromOriginalModelMixin",
+      "PeftAdapterMixin"
+    ],
+    "diffusers.models": [
+      "ModelMixin"
+    ],
+    "diffusers.models.attention_processor": [
+      "Attention"
+    ],
+    "diffusers.models.modeling_outputs": [
+      "Transformer2DModelOutput"
+    ],
+    "diffusers.models.modeling_utils": [
+      "ModelMixin"
+    ],
+    "diffusers.models.transformers.transformer_wan": [
+      "WanRotaryPosEmbed",
+      "WanTimeTextImageEmbedding",
+      "WanTransformerBlock"
+    ],
+    "diffusers.schedulers": [
+      "DEISMultistepScheduler",
+      "FlowMatchEulerDiscreteScheduler"
+    ],
+    "diffusers.schedulers.scheduling_utils": [
+      "KarrasDiffusionSchedulers",
+      "SchedulerMixin",
+      "SchedulerOutput"
+    ],
+    "diffusers.utils": [
+      "BaseOutput",
+      "USE_PEFT_BACKEND",
+      "deprecate",
+      "is_scipy_available",
+      "logging",
+      "scale_lora_layers",
+      "unscale_lora_layers"
+    ],
+    "diffusers.utils.torch_utils": [
+      "randn_tensor"
+    ]
+  }
+}
