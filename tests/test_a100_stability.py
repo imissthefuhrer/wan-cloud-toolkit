@@ -50,9 +50,24 @@ class Workflow(unittest.TestCase):
 
     def test_every_other_workflow_setting_is_preserved(self):
         # Baseline bb732a5 with ONLY node 127 and links 263/266 removed, and
-        # the two compile_args inputs set to null. Covers every other field.
+        # the two compile_args inputs set to null. Normalize the separately
+        # tested duration change back to 65; preserve every other field.
+        next(n for n in self.workflow["nodes"] if n["id"] == 156)["widgets_values"][2] = 65
         digest = hashlib.sha256(json.dumps(self.workflow, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         self.assertEqual(digest, "167dc94bdc8fbe2ab1daa6d260b092c038672d05e709496ce8ca178d333c723b")
+
+    def test_seven_second_duration_preserves_interpolation_and_fps(self):
+        nodes = {n["id"]: n for n in self.workflow["nodes"]}
+        self.assertEqual(nodes[156]["type"], "WanVideoImageToVideoEncode")
+        frames = nodes[156]["widgets_values"][2]
+        multiplier = nodes[115]["widgets_values"][2]
+        fps = nodes[116]["widgets_values"][0]
+        self.assertEqual((frames, multiplier, fps), (113, 2, 32))
+        self.assertEqual((frames - 1) % 4, 0)
+        # RIFE inserts one frame between each pair at 2x and keeps the last.
+        output_frames = (frames - 1) * multiplier + 1
+        self.assertEqual(output_frames, 225)
+        self.assertAlmostEqual(output_frames / fps, 7.03125)
 
 
 class Headers(unittest.TestCase):

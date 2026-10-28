@@ -17,13 +17,20 @@ commit; verification also imports `Wan22` from the installed checkout.
 
 The default workflow disconnects `compile_args` from **both HIGH and LOW Wan
 model loaders** and removes the unused `WanVideoTorchCompileSettings` node.
-Other links, dimensions, frame count, prompts, samplers, model names, LoRA
+Apart from the duration update below, other links, dimensions, prompts, samplers, model names, LoRA
 strengths, block swap, and attention settings are unchanged. This disables only
 the wrapper's optional compilation path, not PyTorch or other components globally.
 The A100 is compute capability 8.0; the pinned wrapper warns that FP8 E4M3
 compilation below 8.9 may be unsupported. That is a **plausible explanation** for
 the observed Inductor/Triton failure, not a proven diagnosis of the kernel error.
 No model weights, dtypes, or CUDA dependencies were changed to work around it.
+
+The current default uses **113 source frames** on `WanVideoImageToVideoEncode`
+(node 156), replacing 65. RIFE remains **2×** and CreateVideo remains **32 FPS**:
+the expected 225 interpolated frames yield approximately **7.03 seconds**.
+Both model-loader compile inputs remain disconnected. This longer setting has
+not yet been validated on a GPU and will require more generation time and may
+use more memory than the previously reported 4-second run.
 
 `python3.11-dev` is required even with optional compilation disabled: Python
 extension helpers used by Torch/Triton or custom nodes can still need `Python.h`
