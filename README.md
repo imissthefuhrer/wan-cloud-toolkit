@@ -2,6 +2,116 @@
 
 Installer and launcher for a pinned ComfyUI/Wan video workflow on a **RunPod NVIDIA GPU pod**. These scripts run inside the rented pod, with persistent storage mounted at `/workspace`.
 
+## A100 stabilization baseline
+
+The first successful **4-second video on an NVIDIA A100 80GB** was reported by
+the operator. This repository now targets ComfyUI **v0.3.46**, commit
+`5d4cc3ba1b412b9acacd37fd23d59e0e1654f83c`, alongside the existing Python 3.11,
+Torch 2.4.1+cu124, protected NVIDIA/Triton/CuPy stack, pinned custom nodes, and
+SageAttention configuration. Do not replace these with latest releases.
+
+The [v0.3.46 latent-format source](https://github.com/Comfy-Org/ComfyUI/blob/5d4cc3ba1b412b9acacd37fd23d59e0e1654f83c/comfy/latent_formats.py)
+defines `Wan22`, which the pinned wrapper imports. The former v0.3.45 pin did
+not define it. Both installation and verification now require the exact v0.3.46
+commit; verification also imports `Wan22` from the installed checkout.
+
+The default workflow disconnects `compile_args` from **both HIGH and LOW Wan
+model loaders** and removes the unused `WanVideoTorchCompileSettings` node.
+Other links, dimensions, frame count, prompts, samplers, model names, LoRA
+strengths, block swap, and attention settings are unchanged. This disables only
+the wrapper's optional compilation path, not PyTorch or other components globally.
+The A100 is compute capability 8.0; the pinned wrapper warns that FP8 E4M3
+compilation below 8.9 may be unsupported. That is a **plausible explanation** for
+the observed Inductor/Triton failure, not a proven diagnosis of the kernel error.
+No model weights, dtypes, or CUDA dependencies were changed to work around it.
+
+`python3.11-dev` is required even with optional compilation disabled: Python
+extension helpers used by Torch/Triton or custom nodes can still need `Python.h`
+and `pyconfig.h`. The apt installer supplies it, including when Python 3.11
+already exists. Preflight checks the **active interpreter's sysconfig include
+paths**, both before setup and from the ComfyUI venv. For a custom `/usr/local`
+Python, Ubuntu's headers may not match; supply matching interpreter headers
+instead of replacing the venv or changing Torch. These presence checks do not
+prove that the compiler/toolchain works on the next template.
+
+The successful pod's full environment and final workflow were not exported, so
+this is a conservative reconstruction from the reported fixes. **One final GPU
+validation is still required next session**; no new GPU generation was run here.
+
+## Preserve and restore the existing network volume
+
+These are instructions for a future, separately authorized session. No pod or
+storage action is performed by the toolkit or local tests.
+
+1. Before ending a paid session, stop submitting jobs, wait for outputs to finish,
+   and preserve outputs, logs, workflow, and dependency snapshot on the actual
+   network volume under `/workspace`. Verify the volume ID and mount, not just
+   the presence of a directory named `/workspace`. Record the template, volume
+   data center, GPU, and revision. Close ComfyUI cleanly and flush writes.
+2. In the RunPod console, the operator may terminate **only the pod**, retaining
+   the existing 100GB **network volume**. Never delete the network volume or
+   request storage cleanup. A pod's local volume disk is different and is lost
+   on termination; data outside the network mount also cannot be assumed safe.
+   Network-volume storage billing continues independently of compute.
+3. For the next authorized rental, select that same existing volume in its data
+   center at pod creation and verify that it is mounted at `/workspace` before
+   running installers. Do not initialize/format the mount or create another copy
+   of the models. RunPod documents network volumes as independent of pod lifetime
+   and attachable at deployment: [network-volume documentation](https://docs.runpod.io/storage/network-volumes).
+4. Check `findmnt -T /workspace`, `df -h /workspace`, and `df -i /workspace`, then
+   inspect `/workspace/ComfyUI`, model files, outputs, Git status, and the saved
+   dependency snapshot. Keep one writer/installer per installation. The 100GB
+   capacity is finite; retained corrupt downloads and outputs also consume space.
+5. New pods may need OS packages and Python headers again because the container
+   layer was ephemeral. After authorization, run `install/apt.sh` and
+   `install/python.sh` if needed. Check that the existing venv interpreter still
+   works with the new template; do not delete it or reinstall ComfyUI as a shortcut.
+6. If the installation already matches v0.3.46 and the protected pins, use
+   `install/verify.sh --basic`, then full `install/verify.sh`; skip bootstrap and
+   downloads when unnecessary. If the old ComfyUI commit remains, review tracked
+   edits and authorize the targeted `install/comfyui.sh` revision update. It
+   reuses the existing checkout/venv and does not download workflow models.
+   Preserve and review local changes rather than resetting or cleaning them.
+7. A rerun of default bootstrap also reuses verified files; `--with-models` is
+   only needed for missing or invalid assets. The download helper hashes existing
+   files against authoritative metadata and resumes `.part` transfers. This
+   requires metadata access and disk reads but does not redownload valid models.
+   Models, URLs, checkpoint paths, and checksum enforcement are unchanged.
+8. Load the updated repository workflow, not a stale browser-saved graph. Confirm
+   both compile inputs are disconnected. Start `./start.sh --full` in tmux,
+   inspect logs and registered nodes, then use the current pod's SSH details
+   with the local connection helper. Ports remain 8888 for ComfyUI and 7777 for
+   code-server. Generate only after the separate preflight/authorization step.
+
+### Cleanup safety
+
+No script formats or recursively removes `/workspace`, model folders, outputs,
+or an existing venv. Installers now refuse tracked Git edits before checkout;
+untracked user files remain in place, and Git refuses conflicting untracked
+overwrites. There is no forced reset/clean or automatic deletion of user data.
+Invalid/duplicate model transfers are moved to unique
+`.wan-download-quarantine.*` directories beside the download, rather than
+deleted. They are never accepted as valid models. Their manual cleanup requires
+explicit operator review/approval and is not part of bootstrap or resume.
+The only recursive shell cleanup removes the newly created temporary Python
+venv probe directory owned by that invocation, not the installed environment.
+
+### Minimum GPU validation next session
+
+- Verify A100 identity, compute capability 8.0, driver, free VRAM/disk, mount,
+  Python headers, exact ComfyUI/custom-node revisions, protected snapshot, pip
+  consistency, and full model checks. Save actual versions and logs.
+- Require successful `Wan22`/diffusers imports, startup without custom-node
+  import failures, API registration of every workflow node, and browser readiness
+  through the existing SSH tunnel.
+- Run one authorized I2V job with the unchanged saved parameters and both compile
+  inputs disconnected. Monitor GPU memory/utilization and generation logs; check
+  the saved video for valid decoding, duration, frame count, and visual output.
+  If it fails, preserve the traceback and workflow before proposing any further
+  change. Export the successful workflow and environment snapshot to the volume.
+- Local graph, shell, header-fixture, safety, download-fixture, and dependency
+  import tests do **not** establish actual GPU generation or compiler compatibility.
+
 ## Pod requirements
 
 - Ubuntu with root access or sudo. Ubuntu 22.04/24.04 are supported for automatic Python 3.11 provisioning.

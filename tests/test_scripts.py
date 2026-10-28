@@ -121,8 +121,10 @@ class Downloads(unittest.TestCase):
     def test_fresh_download_and_verified_rerun(self):
         self.assertEqual(self.download().returncode, 0)
         self.assert_complete()
+        modified = self.destination.stat().st_mtime_ns
         self.assertEqual(self.download().returncode, 0)
         self.assertEqual(self.ranges, [0])
+        self.assertEqual(self.destination.stat().st_mtime_ns, modified)
 
     def test_interruption_resumes_without_publishing_partial_file(self):
         self.interrupt = True
@@ -146,12 +148,25 @@ class Downloads(unittest.TestCase):
         self.assertEqual(self.download().returncode, 0)
         self.assert_complete()
         self.assertEqual(self.ranges, [0])
+        retained = list(self.root.glob('.wan-download-quarantine.*/*'))
+        self.assertEqual([p.read_bytes() for p in retained], [b"x" * len(PAYLOAD)])
 
     def test_bad_checksum_is_rejected(self):
         self.corrupt = True
         self.assertNotEqual(self.download().returncode, 0)
         self.assertFalse(self.destination.exists())
         self.assertFalse(Path(str(self.destination) + ".part").exists())
+        retained = list(self.root.glob('.wan-download-quarantine.*/*'))
+        self.assertEqual([p.read_bytes() for p in retained], [b"x" * len(PAYLOAD)])
+
+    def test_duplicate_partial_and_final_are_retained_or_resumed(self):
+        self.destination.write_bytes(b"legacy invalid bytes")
+        Path(str(self.destination) + ".part").write_bytes(PAYLOAD[:100])
+        self.assertEqual(self.download().returncode, 0)
+        self.assert_complete()
+        self.assertEqual(self.ranges, [100])
+        retained = list(self.root.glob('.wan-download-quarantine.*/*'))
+        self.assertEqual([p.read_bytes() for p in retained], [b"legacy invalid bytes"])
 
     def test_missing_metadata_fails_without_trusting_existing_file(self):
         self.metadata = False

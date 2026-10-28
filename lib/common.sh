@@ -45,6 +45,26 @@ require_command() {
 
 }
 
+# Models/output/venv are often untracked: leave them alone. Git itself refuses
+# a checkout that would overwrite an untracked file at the destination revision.
+require_clean_checkout() {
+    local changes
+    changes="$(git -C "$1" status --porcelain --untracked-files=no)" || return 1
+    if [[ -n "$changes" ]]; then
+        log_error "Tracked local changes in $1; preserve/review them before rerunning the installer. No reset or cleanup was performed."
+        return 1
+    fi
+}
+
+# Retain invalid/duplicate transfers rather than deleting data on /workspace.
+# Cleanup of retained files is a separate, explicitly authorized user action.
+quarantine_model_file() {
+    local directory
+    directory="$(mktemp -d "$(dirname "$1")/.wan-download-quarantine.XXXXXXXX")" || return 1
+    mv -- "$1" "$directory/$(basename "$1")" || return 1
+    log_warn "Retained unverified model data at $directory; review disk space before retrying."
+}
+
 # Combine Python compatibility pins with the existing protected CUDA snapshot.
 # Never add non-CUDA pins to, or regenerate, the protected snapshot as a repair.
 use_wan_constraints() {
@@ -125,7 +145,7 @@ download_model() {
         if [[ ! -e "$partial" ]]; then
             mv -- "$destination" "$partial"
         else
-            rm -- "$destination"
+            quarantine_model_file "$destination" || return 1
         fi
     fi
     # A full-length corrupt file cannot be repaired by resuming at its end.
@@ -134,7 +154,7 @@ download_model() {
             mv -- "$partial" "$destination"
             return 0
         fi
-        rm -- "$partial"
+        quarantine_model_file "$partial" || return 1
     fi
     log_info "Downloading: $(basename "$destination")"
     if ! wget --continue --show-progress -O "$partial" "$url"; then
@@ -142,8 +162,8 @@ download_model() {
         return 1
     fi
     if ! model_matches "$partial" "$expected_size" "$expected_sha"; then
-        log_error "Model size or SHA-256 mismatch: $partial; removing corrupt transfer."
-        rm -f -- "$partial"
+        log_error "Model size or SHA-256 mismatch: $partial; retaining corrupt transfer in quarantine."
+        quarantine_model_file "$partial" || return 1
         return 1
     fi
     mv -- "$partial" "$destination"

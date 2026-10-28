@@ -49,6 +49,7 @@ install_node_repo() {
         git clone "$url" "$dir"
     fi
 
+    require_clean_checkout "$dir"
     git -C "$dir" fetch --all --tags
 
     log_info "Checking out $name revision $revision..."

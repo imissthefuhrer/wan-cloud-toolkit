@@ -81,9 +81,10 @@ done
 # Ubuntu's default python3 is not necessarily 3.11. Preserve an existing
 # template-supplied 3.11 if it can create a complete virtual environment.
 if ! command -v python3.11 >/dev/null 2>&1 || \
-   ! python3.11 -c 'import venv, ensurepip' >/dev/null 2>&1; then
+   ! python3.11 -c 'import venv, ensurepip' >/dev/null 2>&1 || \
+   ! dpkg-query -W -f='${Status}' python3.11-dev 2>/dev/null | grep -qx 'install ok installed'; then
     NEED_PPA=false
-    for package in python3.11 python3.11-venv; do
+    for package in python3.11 python3.11-venv python3.11-dev; do
         if ! apt-cache policy "$package" | grep -Eq 'Candidate: [0-9]'; then
             NEED_PPA=true
         fi
@@ -103,7 +104,7 @@ if ! command -v python3.11 >/dev/null 2>&1 || \
         "${APT_PREFIX[@]}" add-apt-repository -y ppa:deadsnakes/ppa
         "${APT_PREFIX[@]}" apt-get update
     fi
-    "${APT_PREFIX[@]}" apt-get install -y python3.11 python3.11-venv
+    "${APT_PREFIX[@]}" apt-get install -y python3.11 python3.11-venv python3.11-dev
 fi
 
 log_success "System packages complete."

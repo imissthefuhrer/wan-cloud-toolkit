@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/../lib/common.sh"
 COMFY_DIR="${COMFY_DIR:-/workspace/ComfyUI}"
 
 COMFY_REPO="https://github.com/Comfy-Org/ComfyUI.git"
-COMFY_COMMIT="9a470e073e2742d4edd6e7ea1ce28d861a77d9c4"
+COMFY_COMMIT="5d4cc3ba1b412b9acacd37fd23d59e0e1654f83c"
 
 PYTORCH_VERSION="2.4.1"
 TORCHVISION_VERSION="0.19.1"
@@ -69,9 +69,10 @@ fi
 
 log_info "Fetching ComfyUI tags..."
 
+require_clean_checkout "$COMFY_DIR"
 git -C "$COMFY_DIR" fetch --tags
 
-log_info "Checking out ComfyUI 0.3.45..."
+log_info "Checking out ComfyUI 0.3.46..."
 
 git -C "$COMFY_DIR" checkout --detach "$COMFY_COMMIT"
 
@@ -87,7 +88,7 @@ if [[ "$ACTUAL_COMMIT" != "$COMFY_COMMIT" ]]; then
 
 fi
 
-log_success "ComfyUI pinned to 0.3.45."
+log_success "ComfyUI pinned to 0.3.46."
 log_success "Commit: $ACTUAL_COMMIT"
 
 ########################################
@@ -132,6 +133,7 @@ if [[ "$VENV_MAJOR_MINOR" != "3.11" ]]; then
 fi
 
 log_success "ComfyUI venv uses Python $VENV_VERSION."
+"$PYTHON" "$SCRIPT_DIR/../tools/check_python_headers.py"
 
 ########################################
 # Upgrade packaging tools
@@ -180,7 +182,7 @@ if [[ ! -f "$COMFY_DIR/requirements.txt" ]]; then
 
 fi
 
-log_info "Installing ComfyUI 0.3.45 requirements..."
+log_info "Installing ComfyUI 0.3.46 requirements..."
 
 "$PYTHON" -m pip install \
     -r "$COMFY_DIR/requirements.txt" \
@@ -259,7 +261,7 @@ log_success "ComfyUI installation complete."
 
 echo
 echo "ComfyUI:"
-echo "  Version: 0.3.45"
+echo "  Version: 0.3.46"
 echo "  Commit:  $ACTUAL_COMMIT"
 echo "  Path:    $COMFY_DIR"
 echo "  Python:  $VENV_VERSION"

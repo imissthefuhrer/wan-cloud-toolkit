@@ -22,7 +22,7 @@ if [[ $# -gt 1 ]]; then
     exit 1
 fi
 
-EXPECTED_COMFY_COMMIT="9a470e073e2742d4edd6e7ea1ce28d861a77d9c4"
+EXPECTED_COMFY_COMMIT="5d4cc3ba1b412b9acacd37fd23d59e0e1654f83c"
 
 banner
 
@@ -88,6 +88,16 @@ else
     check_fail "ComfyUI main.py missing."
 fi
 
+if [[ -x "$PYTHON" && -f "$COMFY_DIR/comfy/latent_formats.py" ]]; then
+    if (cd "$COMFY_DIR" && "$PYTHON" -c 'from comfy.latent_formats import Wan22'); then
+        check_pass "Wan22 latent format available for the pinned WanVideoWrapper."
+    else
+        check_fail "Wan22 import failed; ComfyUI must be the pinned v0.3.46 revision."
+    fi
+else
+    check_fail "Cannot verify Wan22: ComfyUI latent_formats.py or venv missing."
+fi
+
 ########################################
 # Python
 ########################################
@@ -125,6 +135,12 @@ if [[ -x "$PYTHON" ]]; then
     else
         check_fail \
             "ComfyUI venv uses Python $VENV_PYTHON_VERSION instead of 3.11."
+    fi
+
+    if "$PYTHON" "$SCRIPT_DIR/../tools/check_python_headers.py"; then
+        check_pass "Active ComfyUI Python development headers available."
+    else
+        check_fail "Active Python headers missing; install python3.11-dev or matching template headers before generation."
     fi
 
 else
@@ -425,7 +441,7 @@ if [[ "$FAILURES" -eq 0 ]]; then
 
     echo
     echo "Environment:"
-    echo "  ComfyUI:       0.3.45"
+    echo "  ComfyUI:       0.3.46"
     echo "  Python:        3.11"
     echo "  PyTorch:       2.4.1+cu124"
     echo "  CUDA runtime:  12.4"

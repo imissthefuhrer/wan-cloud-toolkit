@@ -35,6 +35,7 @@ if [[ "$PYTHON_MAJOR_MINOR" != "3.11" ]]; then
 fi
 
 log_success "Python $PYTHON_VERSION detected."
+python3.11 "$SCRIPT_DIR/../tools/check_python_headers.py"
 
 ########################################
 # venv support
