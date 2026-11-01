@@ -214,6 +214,29 @@ An unhealthy process started by this launcher is terminated; existing processes
 are left alone. `COMFY_START_TIMEOUT` defaults to 120 seconds and can be set up
 to 600. A log line saying the server is listening alone is insufficient.
 
+### Automatic performance reports
+
+Normal `./start.sh --full` (and basic startup) now enables private, low-overhead
+per-generation diagnostics automatically, including jobs submitted in the browser.
+Reports, execution journals and GPU/system samples are saved under
+`/workspace/wan-cloud-logs/performance/`, or `$COMFY_LOG_DIR/performance/`.
+Existing console logs remain available. Reports persist with the retained network
+volume when that path is on its verified mount; the pod's local disk is insufficient.
+
+```bash
+python3 tools/performance.py compare                        # Last 10 generations
+python3 tools/performance.py compare /saved/performance --limit 20  # Offline
+```
+
+Set `COMFY_PERFORMANCE=0` to disable diagnostics, or
+`COMFY_PERFORMANCE_INTERVAL=10` to adjust the default five-second sampling interval.
+These exported settings do not change the workflow. Stage times are approximate
+host wall times; VRAM maxima are sampled device usage, not exact Torch peaks.
+Unknown dynamic values are identified rather than inferred from saved widgets.
+See [performance diagnostics](docs/performance.md) for report examples, recovery,
+measurement limits, privacy/storage safeguards and the next GPU validation checklist.
+This implementation has only been tested locally with simulated data.
+
 ### Reproducible WanVideoWrapper dependency repair
 
 `constraints/wan-python.txt` now pins the import-tested Python dependency set:

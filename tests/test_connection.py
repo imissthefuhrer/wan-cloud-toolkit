@@ -2,6 +2,7 @@
 import argparse
 import http.server
 import io
+import os
 import json
 from pathlib import Path
 import socket
@@ -232,6 +233,7 @@ server.serve_forever(); server.server_close()
         self.assertIn("diffusers.schedulers", modules)
         self.assertIn("diffusers.utils.torch_utils", modules)
 
+    @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_startup_exit_is_failure_and_status_is_saved(self):
         with tempfile.TemporaryDirectory() as tmp:
             process = Mock(stdout=io.BytesIO(b"(IMPORT FAILED): custom_nodes/ComfyUI-WanVideoWrapper\n"), returncode=1)
@@ -241,6 +243,7 @@ server.serve_forever(); server.server_close()
                     server.supervise(tmp, 8888, .1, tmp)
             self.assertEqual(len(list(Path(tmp).glob("*.status"))), 1)
 
+    @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_ready_requires_api_success(self):
         with tempfile.TemporaryDirectory() as tmp:
             process = Mock(stdout=io.BytesIO(b"Starting server\n"), returncode=0)
@@ -251,6 +254,7 @@ server.serve_forever(); server.server_close()
             status = next(Path(tmp).glob("*.status")).read_text()
             self.assertIn("ready=True", status)
 
+    @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_http_timeout_stops_only_owned_process(self):
         with tempfile.TemporaryDirectory() as tmp:
             process = Mock(stdout=io.BytesIO(b"Starting server\n"), returncode=-15)

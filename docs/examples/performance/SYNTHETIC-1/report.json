@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "session": "SYNTHETIC",
+  "prompt_id": "SYNTHETIC-1",
+  "queued_utc": "not_observed",
+  "started_utc": "2026-01-01T00:00:00+00:00",
+  "start_monotonic": 0,
+  "status": "success",
+  "coverage": [],
+  "settings": {
+    "evidence": "submitted API inputs; linked constants resolved; dynamic node outputs unknown unless observed",
+    "effective_resolution": [
+      720,
+      480
+    ],
+    "output_duration_seconds": "not_observed",
+    "nodes": {
+      "3": {
+        "type": "WanVideoModelLoader",
+        "inputs": {
+          "model": "Wan_HIGH.safetensors",
+          "base_precision": "fp16",
+          "block_swap_args": "unknown (connected output not observed)",
+          "optional_torch_compile": "disabled (input disconnected)"
+        },
+        "model_phase": "HIGH"
+      },
+      "4": {
+        "type": "WanVideoSampler",
+        "inputs": {
+          "model": "unknown (connected output not observed)",
+          "steps": 8,
+          "start_step": 0,
+          "end_step": 4,
+          "scheduled_step_count": 4
+        },
+        "model_phase": "HIGH"
+      },
+      "5": {
+        "type": "WanVideoImageToVideoEncode",
+        "inputs": {
+          "width": "unknown (connected output not observed)",
+          "height": "unknown (connected output not observed)",
+          "num_frames": 113
+        }
+      },
+      "6": {
+        "type": "RIFE VFI",
+        "inputs": {
+          "multiplier": 2
+        }
+      },
+      "7": {
+        "type": "CreateVideo",
+        "inputs": {
+          "fps": 32
+        }
+      },
+      "8": {
+        "type": "WanVideoDecode",
+        "inputs": {}
+      },
+      "9": {
+        "type": "WanVideoBlockSwap",
+        "inputs": {
+          "blocks_to_swap": 20
+        }
+      },
+      "11": {
+        "type": "LoadImage",
+        "inputs": {
+          "image": "input.png"
+        }
+      },
+      "13": {
+        "type": "WanVideoModelLoader",
+        "inputs": {
+          "model": "Wan_LOW.safetensors",
+          "optional_torch_compile": "disabled (input disconnected)"
+        },
+        "model_phase": "LOW"
+      },
+      "14": {
+        "type": "WanVideoSampler",
+        "inputs": {
+          "model": "unknown (connected output not observed)",
+          "steps": 8,
+          "start_step": 4,
+          "end_step": 10000,
+          "scheduled_step_count": 4
+        },
+        "model_phase": "LOW"
+      },
+      "15": {
+        "type": "SaveVideo",
+        "inputs": {}
+      }
+    },
+    "requested_resolution": [
+      null,
+      null
+    ],
+    "source_frames": 113,
+    "interpolation_multiplier": 2,
+    "output_fps": 32,
+    "expected_output_frames": 225,
+    "expected_duration_seconds": 7.03125,
+    "observed_sampling": {
+      "frames": 113,
+      "width": 720,
+      "height": 480,
+      "steps": 4,
+      "console_byte_approx": 84,
+      "evidence": "WanVideoWrapper runtime log; steps may be split sampler steps"
+    },
+    "sampling_observations": [
+      {
+        "frames": 113,
+        "width": 720,
+        "height": 480,
+        "steps": 4,
+        "console_byte_approx": 40,
+        "evidence": "WanVideoWrapper runtime log; steps may be split sampler steps"
+      },
+      {
+        "frames": 113,
+        "width": 720,
+        "height": 480,
+        "steps": 4,
+        "console_byte_approx": 84,
+        "evidence": "WanVideoWrapper runtime log; steps may be split sampler steps"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "node_id": "3",
+      "stage": "model_loading",
+      "phase": "HIGH",
+      "start_monotonic": 1,
+      "console_byte_approx": 40,
+      "wall_seconds_approx": 5
+    },
+    {
+      "node_id": "4",
+      "stage": "sampler",
+      "phase": "HIGH",
+      "start_monotonic": 6,
+      "console_byte_approx": 40,
+      "wall_seconds_approx": 34.0
+    },
+    {
+      "node_id": "13",
+      "stage": "model_loading",
+      "phase": "LOW",
+      "start_monotonic": 40.0,
+      "console_byte_approx": 84,
+      "wall_seconds_approx": 5.0
+    },
+    {
+      "node_id": "14",
+      "stage": "sampler",
+      "phase": "LOW",
+      "start_monotonic": 45.0,
+      "console_byte_approx": 84,
+      "wall_seconds_approx": 35.0
+    },
+    {
+      "node_id": "8",
+      "stage": "vae_decode",
+      "phase": "unknown",
+      "start_monotonic": 80.0,
+      "console_byte_approx": 128,
+      "wall_seconds_approx": 10.0
+    },
+    {
+      "node_id": "6",
+      "stage": "rife",
+      "phase": "unknown",
+      "start_monotonic": 90.0,
+      "console_byte_approx": 128,
+      "wall_seconds_approx": 5.0
+    },
+    {
+      "node_id": "7",
+      "stage": "video_creation",
+      "phase": "unknown",
+      "start_monotonic": 95.0,
+      "console_byte_approx": 128,
+      "wall_seconds_approx": 3.0
+    },
+    {
+      "node_id": "15",
+      "stage": "video_save",
+      "phase": "unknown",
+      "start_monotonic": 98.0,
+      "console_byte_approx": 128,
+      "wall_seconds_approx": 2.0
+    }
+  ],
+  "sampled_peak_vram_mib": {
+    "GPU-SYNTHETIC": 23000
+  },
+  "console": {
+    "path": "../synthetic-console.txt",
+    "start_byte": 40,
+    "end_byte": 128
+  },
+  "timing_basis": "host monotonic wall-clock between node-start events; includes transfers, async GPU work and overhead; not GPU kernel timing",
+  "synthetic": true,
+  "ended_utc": "2026-01-01T00:03:00Z",
+  "wall_seconds": 100,
+  "notes": [
+    "VRAM peaks are sampled device-wide usage, not exact PyTorch allocations.",
+    "Event duration ends at the execution result; ComfyUI console execution seconds, when observed, may also include executor cleanup.",
+    "Model HIGH/LOW identity is in node model names and sampler model links; model work may be deferred into samplers.",
+    "No full prompts, image data, environment or traceback payloads are stored here. See console byte range for original evidence.",
+    "Actual output frame count/duration and dynamic values are not observed unless explicitly stated."
+  ]
+}

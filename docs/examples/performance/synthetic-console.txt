@@ -1,0 +1,7 @@
+SYNTHETIC console fixture; no GPU used.
+Sampling 113 frames at 720x480 with 4 steps
+Sampling 113 frames at 720x480 with 4 steps
+Sampling 113 frames at 832x480 with 4 steps
+Sampling 113 frames at 832x480 with 4 steps
+Sampling 113 frames at 960x480 with 4 steps
+Sampling 113 frames at 960x480 with 4 steps

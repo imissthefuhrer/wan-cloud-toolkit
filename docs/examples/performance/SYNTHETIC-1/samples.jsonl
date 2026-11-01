@@ -1,0 +1,1 @@
+{"utc": "2026-01-01T00:00:05Z", "monotonic": 5, "synthetic": true, "gpus": [{"uuid": "GPU-SYNTHETIC", "name": "Simulated GPU", "memory.used": 23000, "memory.total": 49152, "utilization.gpu": 95}]}
