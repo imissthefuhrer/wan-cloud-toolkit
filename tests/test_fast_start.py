@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import quick_check as quick
 import start_comfyui as server
+import check_image as image_probe
 from comfy_health import port_number
 
 
@@ -59,6 +60,36 @@ class QuickChecks(unittest.TestCase):
                         gpu.assert_not_called()
                     if failure != 'environment':
                         env.assert_not_called()
+
+    def test_added_node_invalidates_inventory_without_tracking_caches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'ComfyUI-WanVideoWrapper').mkdir()
+            before = quick.node_inventory(root)
+            (root / '__pycache__').mkdir()
+            self.assertEqual(quick.node_inventory(root), before)
+            (root / 'unreviewed-node').mkdir()
+            self.assertNotEqual(quick.node_inventory(root), before)
+
+    def test_system_identity_includes_built_package_manifest(self):
+        with patch.object(quick, 'digest', side_effect=lambda p: str(p)), patch.object(Path, 'is_file', return_value=True):
+            identity = quick.system_identity()
+        self.assertEqual(identity['image_packages'], '/etc/wan-cloud-system-packages.txt')
+        self.assertIn('libc', identity)
+
+    def test_quick_verification_failure_prevents_supervisor_launch(self):
+        from test_scripts import EntryPoints, executable
+        fixture = EntryPoints()
+        fixture.setUp()
+        try:
+            executable(fixture.root / 'install/verify.sh', '#!/bin/bash\nexit 17\n')
+            result = fixture.run_script('start.sh', '--quick')
+            self.assertEqual(result.returncode, 17)
+            calls = fixture.log.read_text().splitlines()
+            self.assertEqual(len(calls), 1)  # Port/process preflight only.
+            self.assertIn('--preflight', calls[0])
+        finally:
+            fixture.doCleanups()
 
     def test_models_stat_only_and_missing_models(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,6 +168,22 @@ class ImageContract(unittest.TestCase):
         self.assertIn('python3.11 -m venv', workflow)
         self.assertNotIn('docker push', workflow)
         self.assertNotIn(':latest', workflow)
+
+
+    def test_cpu_image_probe_checks_abi_libraries_without_driver(self):
+        with patch.object(image_probe, 'headers'), patch.object(image_probe.sys, 'executable', '/usr/bin/python3.11'), patch.object(image_probe.importlib, 'import_module') as importer, patch.object(image_probe.subprocess, 'run', return_value=Mock(stdout='libc.so found', stderr='')), patch.object(image_probe.ctypes, 'CDLL') as loader, patch.object(Path, 'is_file', return_value=True):
+            image_probe.check()
+            self.assertIn('ensurepip', [c.args[0] for c in importer.call_args_list])
+            self.assertEqual([c.args[0] for c in loader.call_args_list],
+                             ['libstdc++.so.6', 'libgomp.so.1', 'libnvrtc.so.12'])
+
+    def test_cpu_probe_rejects_wrong_path_and_missing_shared_libraries(self):
+        with patch.object(image_probe, 'headers'), patch.object(image_probe.sys, 'executable', '/usr/local/bin/python3.11'):
+            with self.assertRaisesRegex(RuntimeError, 'Expected image interpreter'):
+                image_probe.check()
+        with patch.object(image_probe, 'headers'), patch.object(image_probe.sys, 'executable', '/usr/bin/python3.11'), patch.object(image_probe.importlib, 'import_module'), patch.object(image_probe.subprocess, 'run', return_value=Mock(stdout='libssl.so => not found', stderr='')):
+            with self.assertRaisesRegex(RuntimeError, 'unresolved shared libraries'):
+                image_probe.check()
 
     def test_autostart_keeps_logs_ssh_and_supervisor(self):
         entry = (ROOT / 'docker/entrypoint.sh').read_text()

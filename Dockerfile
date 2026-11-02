@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/wan-cloud-toolkit
 COPY . /opt/wan-cloud-toolkit/
 RUN python3.11 tools/check_python_headers.py && \
+    python3.11 tools/check_image.py && \
+    dpkg-query -W > /etc/wan-cloud-system-packages.txt && \
     python3.11 -m venv /tmp/wan-image-probe && \
     /tmp/wan-image-probe/bin/python -m pip --version && \
     rm -rf /tmp/wan-image-probe && \

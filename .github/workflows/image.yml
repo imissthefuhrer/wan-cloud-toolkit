@@ -13,9 +13,10 @@ jobs:
       - name: Build and test on CPU
         run: |
           set -Eeuo pipefail
+          df -h /
           image="wan-cloud-toolkit:git-${GITHUB_SHA}"
           docker build --platform linux/amd64 -t "$image" .
-          docker run --rm --entrypoint bash "$image" -c 'python3.11 tools/check_python_headers.py && python3.11 -m venv /tmp/probe && /tmp/probe/bin/python -m pip --version && test -x /usr/sbin/sshd && test -x /usr/local/cuda/bin/nvcc'
+          docker run --rm --entrypoint bash "$image" -c 'python3.11 tools/check_image.py && python3.11 -m venv /tmp/probe && /tmp/probe/bin/python -m pip --version && test -x /usr/sbin/sshd && test -x /usr/local/cuda/bin/nvcc'
           docker image inspect "$image" --format '{{.Id}}'
           docker save "$image" | gzip > wan-cloud-toolkit.tar.gz
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

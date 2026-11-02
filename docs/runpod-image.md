@@ -22,9 +22,15 @@ node revisions are untouched. Use A6000 or A100-class hardware; Blackwell is
 rejected by the quick driver probe. This design/source review is **not** a tested
 container/GPU compatibility claim.
 
+The supplied previous venv base path, `/usr/bin/python3.11`, matches this image.
+That removes the custom `/usr/local` path mismatch risk, but does not prove the
+old extension modules have compatible shared libraries.
+
 Python 3.11, venv, ensurepip and matching development headers are installed from
 the signed Deadsnakes PPA into `/usr`. Each image build executes a header check
-and creates a temporary venv to test pip. Ubuntu/Deadsnakes package repositories
+and creates a temporary venv to test pip. The CPU probe also requires the exact
+interpreter path, imports standard extension modules, checks `ldd`, and loads
+C++/OpenMP/NVRTC libraries without calling the GPU driver. Ubuntu/Deadsnakes package repositories
 are not frozen; rebuilding a commit may produce different OS package revisions.
 Retain and deploy the built image **by registry digest** for reproducible rentals.
 Never overwrite a published version tag. For bit-identical rebuilds, an additional
@@ -70,7 +76,7 @@ part of the local offline tests.
 ```bash
 docker build --platform linux/amd64 -t wan-cloud-toolkit:git-COMMIT_SHA .
 docker run --rm --entrypoint bash wan-cloud-toolkit:git-COMMIT_SHA -c \
-  'python3.11 tools/check_python_headers.py && python3.11 -m venv /tmp/probe && /tmp/probe/bin/python -m pip --version'
+  'python3.11 tools/check_image.py && python3.11 -m venv /tmp/probe && /tmp/probe/bin/python -m pip --version'
 ```
 
 The context uses an allowlist: no Git metadata, credentials, models, outputs,
@@ -184,8 +190,8 @@ service. The launcher separately checks port/process availability before startin
 | Storage | Exact `/workspace` mount; reject overlay/tmpfs/ramfs; match marker | Console volume identity, capacity/inodes and integrity provenance |
 | Python | Execute existing 3.11 venv, prefix and active development headers | Venv provisioning/repair only when explicitly authorized |
 | GPU | `nvidia-smi`, CUDA driver init/device count, reject Blackwell | Torch/CuPy operations and backend compatibility |
-| Dependencies | Compare installed name/version metadata with full-check record | Existing imports, pip consistency, protected stack validation |
-| Code/config | Compare pinned Git HEADs and tracked diffs for ComfyUI + five pinned nodes; hash small workflow, constraints, interpolation config, toolkit Python helpers | Inspect any added nodes, requirements or runtime config changes |
+| Dependencies | Compare installed name/version metadata and built image system-package manifest with full-check record | Existing imports, pip consistency, protected stack validation |
+| Code/config | Compare pinned Git HEADs and tracked diffs for ComfyUI + five pinned nodes; compare top-level custom-node inventory; hash small workflow, constraints, interpolation config, toolkit Python helpers and launcher scripts | Inspect any added nodes, requirements or runtime config changes |
 | Models | Required exact paths including configured RIFE path, nonempty regular files; compare resolved path, size and mtime | Download verifier's authoritative SHA-256/size validation |
 | Port/process | Existing supervisor refuses duplicate ComfyUI/occupied port; reject 7777 | Operator checks RunPod HTTP/TCP configuration |
 | Readiness | Existing API/node/import-failure checks after real startup | Authorized generation proves runtime behavior |
@@ -194,8 +200,9 @@ Quick checks do not recursively traverse models, read model bodies, import heavy
 ML modules, run pip check, or execute GPU kernels. Git examines tracked source
 files; installed distribution metadata is enumerated once. Model stat comparisons
 can miss same-size corruption with preserved timestamps. Version metadata cannot
-prove package file integrity. Untracked source changes, added custom nodes and
-other ComfyUI user settings are not automatically fingerprinted. After **any**
+prove package file integrity. Untracked source contents inside existing nodes and other ComfyUI user settings
+are not automatically fingerprinted. Added/removed top-level custom-node entries
+are detected (excluding hidden files and bytecode caches). After **any**
 installation, dependency, node, workflow/configuration change, or suspected disk
 corruption, remove only the verification record (or leave it to fail), run the
 appropriate authorized full/integrity checks and `verify.sh --record-fast` again.
@@ -243,3 +250,7 @@ sandbox. The skipped tests require an explicitly configured Python 3.11 diffuser
 test environment. Bash syntax checks passed for root, install, lib and docker
 scripts; `git diff --check` passed. No Docker image build, publication, remote
 command, model download, Pod deployment or GPU generation was performed.
+
+The follow-up [deployment-readiness review](deployment-readiness.md) includes
+the strengthened image probe, record invalidation fixes, 107-test review results,
+and exact future GitHub Actions/private GHCR/template steps.

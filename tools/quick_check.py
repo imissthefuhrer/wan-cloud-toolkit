@@ -57,6 +57,20 @@ def stamp(path):
     return [str(path.resolve()), s.st_size, s.st_mtime_ns]
 
 
+def system_identity():
+    # Captured at build time, not by running dpkg on every startup.
+    manifest = Path('/etc/wan-cloud-system-packages.txt')
+    return dict(os_release=digest(Path('/etc/os-release')),
+                image_packages=digest(manifest) if manifest.is_file() else None,
+                libc=os.confstr('CS_GNU_LIBC_VERSION'))
+
+
+def node_inventory(node_root):
+    # One directory level only. Runtime bytecode caches do not invalidate checks.
+    return sorted(p.name for p in node_root.iterdir()
+                  if p.name != '__pycache__' and not p.name.startswith('.'))
+
+
 def environment(directory):
     headers()
     if sys.prefix == sys.base_prefix or Path(sys.prefix).resolve() != (directory / 'venv').resolve():
@@ -75,11 +89,14 @@ def environment(directory):
         'loras/Wan2.2-Lightning_I2V-A14B-4steps-lora_LOW_fp16.safetensors',
         'vae/wan_2.1_vae.safetensors']
     repos = [directory] + [node_root / n for n in NODES]
-    return dict(schema=1, directory=str(directory), packages=packages,
+    return dict(schema=2, directory=str(directory), packages=packages,
+                system=system_identity(), nodes=node_inventory(node_root),
                 python=[sys.version, sys.base_prefix, stamp(Path(sys.executable).resolve())],
                 revisions=[run('git', '-C', str(p), 'rev-parse', 'HEAD') for p in repos],
                 tracked_edits=[hashlib.sha256(run('git', '-C', str(p), 'diff', '--no-ext-diff', 'HEAD', '--').encode()).hexdigest() for p in repos],
                 toolkit=[digest(p) for p in sorted((ROOT / 'tools').glob('*.py'))],
+                launchers=[digest(ROOT / p) for p in ('start.sh', 'fast-start.sh', 'install/verify.sh',
+                           'docker/autostart.sh', 'docker/entrypoint.sh')],
                 config=[digest(config), digest(directory / 'wan-cloud-constraints.txt'),
                         digest(ROOT / 'workflows/Wan22-I2V-Remix.json'),
                         digest(ROOT / 'constraints/wan-python.txt')],
