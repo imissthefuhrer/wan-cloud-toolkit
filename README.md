@@ -17,6 +17,11 @@ The old full/basic verification and installer remain available. The startup dead
 now defaults to 300 seconds (maximum 600), with persistent readiness diagnostics.
 The new image/fast path still requires real-Pod validation; no image has been published.
 
+For publishing directly from a CPU runner without downloading an image archive,
+see [the separate manual GHCR publisher](docs/ghcr-publishing.md). It tests before
+pushing, uses the job token, refuses existing commit tags and reports a private
+registry digest. Publication requires explicitly running that workflow.
+
 ## A100 stabilization baseline
 
 The first successful **4-second video on an NVIDIA A100 80GB** was reported by

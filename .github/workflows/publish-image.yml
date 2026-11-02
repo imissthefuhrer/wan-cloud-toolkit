@@ -1,0 +1,76 @@
+name: Build, test and publish WAN Pod image to GHCR
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: CPU runner label (use a larger x64 CPU runner if disk is insufficient)
+        required: true
+        default: ubuntu-22.04
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: wan-ghcr-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'imissthefuhrer/wan-cloud-toolkit' && github.ref == 'refs/heads/main'
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.digest.outputs.image }}
+      digest: ${{ steps.digest.outputs.digest }}
+    env:
+      IMAGE: ghcr.io/imissthefuhrer/wan-cloud-toolkit
+      DOCKER_CONFIG: ${{ runner.temp }}/wan-docker-auth
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check disk capacity
+        run: |
+          df -h /
+          python3 tools/ghcr_publish.py disk
+      - name: Offline regression tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Check private package and unused commit tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/ghcr_publish.py preflight --tag "git-$GITHUB_SHA"
+      - name: Build linux/amd64 image locally
+        run: |
+          set -Eeuo pipefail
+          docker build --platform linux/amd64 \
+            --label org.opencontainers.image.source=https://github.com/imissthefuhrer/wan-cloud-toolkit \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$IMAGE:git-$GITHUB_SHA" .
+          df -h /
+      - name: Test container compatibility on CPU before publishing
+        run: |
+          set -Eeuo pipefail
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$IMAGE:git-$GITHUB_SHA")" = linux/amd64
+          docker run --rm --entrypoint bash "$IMAGE:git-$GITHUB_SHA" -c 'python3.11 tools/check_image.py && python3.11 -m venv /tmp/probe && /tmp/probe/bin/python -m pip --version && test -x /usr/sbin/sshd && test -x /usr/local/cuda/bin/nvcc'
+      - name: Publish the tested image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          # Recheck immediately before pushing; never replace an existing SHA tag.
+          python3 tools/ghcr_publish.py preflight --tag "git-$GITHUB_SHA"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:git-$GITHUB_SHA"
+      - name: Verify privacy and output the registry digest
+        id: digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          python3 tools/ghcr_publish.py private --tag "git-$GITHUB_SHA"
+          docker image inspect "$IMAGE:git-$GITHUB_SHA" --format '{{json .RepoDigests}}' > "$RUNNER_TEMP/wan-repodigests.json"
+          python3 tools/ghcr_publish.py report --repodigests "$RUNNER_TEMP/wan-repodigests.json"
+      - name: Remove job registry login
+        if: always()
+        run: docker logout ghcr.io
