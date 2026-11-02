@@ -327,4 +327,22 @@ python3 -m unittest discover -s tests -v
 for script in *.sh install/*.sh lib/*.sh; do bash -n "$script" || exit; done
 ```
 
+Workflow changes also require the real GitHub Actions validator (YAML parsing alone
+cannot catch context-availability errors):
+
+```bash
+./tools/install_actionlint.sh /tmp/wan-actionlint   # Pinned 1.7.12, SHA-256 verified
+export PATH="/tmp/wan-actionlint:$PATH"
+./tools/lint_workflows.sh
+```
+
+The separate **Lint GitHub Actions workflows** CI workflow runs on relevant pushes
+and pull requests, with read-only permissions and no image build or publication.
+To block invalid workflows locally **before pushing**, opt into the tracked hook:
+`git config --local core.hooksPath .githooks`. This replaces the hook-directory
+setting, so inspect any existing hooks/configuration before enabling it. The hook
+requires actionlint on PATH and fails if it is missing. No hook is enabled
+automatically. The full test suite also runs real actionlint checks when installed;
+the dedicated lint CI check always installs and requires it.
+
 The tests exercise interrupted/resumed downloads, checksum failures, existing corrupt files, bootstrap verification modes, and startup failure handling using temporary fixtures and a local HTTP server. Full installation and generation must additionally be tested on the selected RunPod template and GPU.
