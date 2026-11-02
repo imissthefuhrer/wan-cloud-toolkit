@@ -224,15 +224,26 @@ class EntryPoints(unittest.TestCase):
                 self.assertEqual(self.run_script("start.sh", *args).returncode, 0)
                 calls = self.log.read_text().splitlines()
                 self.assertIn("--port 8888 --preflight", calls[0])
-                self.assertIn("tools/check_diffusers.py", calls[1])
-                self.assertEqual(calls[2], verification)
-                self.assertIn("--port 8888 --timeout 300", calls[3])
+                self.assertEqual(calls[1], verification)
+                self.assertIn("--port 8888 --timeout 300", calls[2])
+                self.assertEqual(len(calls), 3)
+                self.assertEqual(sum(line.startswith("verify ") for line in calls), 1)
+                self.assertNotIn("check_diffusers.py", "\n".join(calls))
+
+    def test_start_timeout_override_and_single_diffusers_check(self):
+        self.env["COMFY_START_TIMEOUT"] = "420"
+        self.assertEqual(self.run_script("start.sh", "--full").returncode, 0)
+        calls = self.log.read_text().splitlines()
+        self.assertIn("--timeout 420", calls[-1])
+        self.assertEqual(calls[1], "verify ")
+        verification = (ROOT / "install/verify.sh").read_text()
+        self.assertEqual(verification.count('"$SCRIPT_DIR/../tools/check_diffusers.py"'), 1)
 
     def test_verification_failure_prevents_start(self):
         executable(self.root / "install/verify.sh", "#!/bin/bash\nexit 9\n")
         self.assertEqual(self.run_script("start.sh").returncode, 9)
         calls = self.log.read_text().splitlines()
-        self.assertEqual(len(calls), 2)  # Preflight and CPU import check; no startup.
+        self.assertEqual(len(calls), 1)  # Port/process preflight only; no startup.
 
     def test_unknown_start_option_rejected(self):
         self.assertNotEqual(self.run_script("start.sh", "--unknown").returncode, 0)

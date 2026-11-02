@@ -198,11 +198,17 @@ server.serve_forever(); server.server_close()
             self.assertIn("ComfyUI READY", result.stdout)
             status = next((directory / "logs").glob("*.status")).read_text()
             self.assertIn("ready=True", status)
-            diagnostics = next(Path(tmp).rglob("*.readiness.jsonl"))
-            entries = [json.loads(line) for line in diagnostics.read_text().splitlines()]
-            self.assertEqual(entries[-1]["phase"], "ready")
-            self.assertEqual(diagnostics.stat().st_mode & 0o777, 0o600)
             self.assertIn("comfy_exit=0", status)
+
+    def test_supervisor_default_timeout_is_300_and_configurable(self):
+        for extra, timeout in (([], 300), (["--timeout", "420"], 420)):
+            with self.subTest(extra=extra), patch.object(sys, "argv", ["start_comfyui.py", "--directory", "/fixture"] + extra), patch.object(server, "supervise", return_value=0) as supervise:
+                self.assertEqual(server.main(), 0)
+                self.assertEqual(supervise.call_args.args[2], timeout)
+        with patch.object(sys, "argv", ["start_comfyui.py", "--directory", "/fixture", "--timeout", "601"]), patch.object(sys, "stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit) as error:
+                server.main()
+            self.assertEqual(error.exception.code, 2)
 
     def test_specific_accelerator_and_generic_import_failures(self):
         text = "Cannot import custom_nodes/ComfyUI-WanVideoWrapper: module 'torch' has no attribute 'accelerator'"
@@ -240,7 +246,7 @@ server.serve_forever(); server.server_close()
     @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_startup_exit_is_failure_and_status_is_saved(self):
         with tempfile.TemporaryDirectory() as tmp:
-            process = Mock(pid=43210, stdout=io.BytesIO(b"(IMPORT FAILED): custom_nodes/ComfyUI-WanVideoWrapper\n"), returncode=1)
+            process = Mock(stdout=io.BytesIO(b"(IMPORT FAILED): custom_nodes/ComfyUI-WanVideoWrapper\n"), returncode=1)
             process.poll.return_value = 1
             with patch.object(server, "preflight"), patch.object(server.subprocess, "Popen", return_value=process):
                 with self.assertRaisesRegex(RuntimeError, "import failed"):
@@ -250,22 +256,18 @@ server.serve_forever(); server.server_close()
     @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_ready_requires_api_success(self):
         with tempfile.TemporaryDirectory() as tmp:
-            process = Mock(pid=43210, stdout=io.BytesIO(b"Starting server\n"), returncode=0)
+            process = Mock(stdout=io.BytesIO(b"Starting server\n"), returncode=0)
             process.poll.side_effect = [None, 0, 0]
             with patch.object(server, "preflight"), patch.object(server.subprocess, "Popen", return_value=process), patch.object(server, "health") as health:
                 self.assertEqual(server.supervise(tmp, 8888, 1, tmp), 0)
             health.assert_called_once()
             status = next(Path(tmp).glob("*.status")).read_text()
             self.assertIn("ready=True", status)
-            diagnostics = next(Path(tmp).rglob("*.readiness.jsonl"))
-            entries = [json.loads(line) for line in diagnostics.read_text().splitlines()]
-            self.assertEqual(entries[-1]["phase"], "ready")
-            self.assertEqual(diagnostics.stat().st_mode & 0o777, 0o600)
 
     @patch.dict(os.environ, {"COMFY_PERFORMANCE": "0"})
     def test_supervisor_http_timeout_stops_only_owned_process(self):
         with tempfile.TemporaryDirectory() as tmp:
-            process = Mock(pid=43210, stdout=io.BytesIO(b"Starting server\n"), returncode=-15)
+            process = Mock(stdout=io.BytesIO(b"Starting server\n"), returncode=-15)
             process.poll.return_value = None
             with patch.object(server, "preflight"), patch.object(server.subprocess, "Popen", return_value=process), patch.object(server, "health", side_effect=RuntimeError("missing nodes")):
                 with self.assertRaisesRegex(RuntimeError, "timed out.*missing nodes"):

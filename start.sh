@@ -14,11 +14,10 @@ VERIFY_ARGS=(--basic)
 case "${1:-}" in
     "") ;;
     --full) VERIFY_ARGS=() ;;
-    --quick) VERIFY_ARGS=(--quick) ;;
-    *) log_error "Usage: $0 [--full|--quick]"; exit 1 ;;
+    *) log_error "Usage: $0 [--full]"; exit 1 ;;
 esac
 if [[ $# -gt 1 ]]; then
-    log_error "Usage: $0 [--full|--quick]"
+    log_error "Usage: $0 [--full]"
     exit 1
 fi
 
@@ -47,9 +46,6 @@ fi
 ########################################
 
 python3 "$SCRIPT_DIR/tools/start_comfyui.py" --directory "$COMFY_DIR" --port "$PORT" --preflight
-if [[ "${1:-}" != --quick ]]; then
-    "$PYTHON" "$SCRIPT_DIR/tools/check_diffusers.py"
-fi
 
 log_info "Running installation verification..."
 echo

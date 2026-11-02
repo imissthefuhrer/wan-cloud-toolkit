@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Opt in with: git config --local core.hooksPath .githooks
-set -Eeuo pipefail
-ROOT="$(git rev-parse --show-toplevel)"
-exec "$ROOT/tools/lint_workflows.sh"

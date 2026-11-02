@@ -2,25 +2,27 @@
 
 Installer and launcher for a pinned ComfyUI/Wan video workflow on a **RunPod NVIDIA GPU pod**. These scripts run inside the rented pod, with persistent storage mounted at `/workspace`.
 
-## Reusable Pod image and fast startup
+## Normal startup on the original RunPod template
 
-See [the image, private template, build and first-deployment guide](docs/runpod-image.md).
-The new `Dockerfile` bakes Python 3.11, matching headers and system tools outside
-`/workspace`. It reuses the existing persistent venv/models without installing or
-downloading anything on ordinary startup. CPU-only GitHub Actions can build and
-test the image without publishing it.
+For an existing installation on the original working template, after authorization:
 
-After first-deployment preflight and full `install/verify.sh --record-fast`, use
-`./fast-start.sh` in tmux (or template autostart) for lightweight checks followed
-by the existing supervised API/node validation, console logs and performance reports.
-The old full/basic verification and installer remain available. The startup deadline
-now defaults to 300 seconds (maximum 600), with persistent readiness diagnostics.
-The new image/fast path still requires real-Pod validation; no image has been published.
+1. Confirm the **existing network volume** is attached at `/workspace`. Check its
+   identity, mount, free space, GPU and existing processes before any writes.
+2. If Python 3.11, matching headers or system dependencies are missing, run
+   `./install/apt.sh`. Reuse the existing ComfyUI venv and models; do not rerun
+   bootstrap or reinstall them as a routine startup step.
+3. From the toolkit checkout, run `./start.sh --full` directly in a named tmux
+   session. It performs one complete installation/model-presence verification,
+   including the diffusers import check, before supervised startup. Do not run a
+   separate full verification immediately beforehand.
 
-For publishing directly from a CPU runner without downloading an image archive,
-see [the separate manual GHCR publisher](docs/ghcr-publishing.md). It tests before
-pushing, uses the job token, refuses existing commit tags and reports a private
-registry digest. Publication requires explicitly running that workflow.
+Export `COMFY_DIR=/workspace/ComfyUI` and `COMFY_PORT=8888` when setting them
+explicitly. Console logs/status and automatic performance reports remain under
+`/workspace/wan-cloud-logs`. The default startup deadline is **300 seconds**;
+export `COMFY_START_TIMEOUT` to override it (maximum 600). After successful
+API/node readiness, use the existing SSH connection helper below for browser
+access on port 8888. Model integrity and GPU generation authorization requirements
+still apply; startup verification does not hash model files or generate video.
 
 ## A100 stabilization baseline
 
@@ -93,10 +95,11 @@ storage action is performed by the toolkit or local tests.
    layer was ephemeral. After authorization, run `install/apt.sh` and
    `install/python.sh` if needed. Check that the existing venv interpreter still
    works with the new template; do not delete it or reinstall ComfyUI as a shortcut.
-6. If the installation already matches v0.3.46 and the protected pins, use
-   `install/verify.sh --basic`, then full `install/verify.sh`; skip bootstrap and
-   downloads when unnecessary. If the old ComfyUI commit remains, review tracked
-   edits and authorize the targeted `install/comfyui.sh` revision update. It
+6. If the installation already matches v0.3.46 and the protected pins, skip
+   bootstrap and unnecessary downloads. Run `./start.sh --full` directly in tmux;
+   it performs the full verification once before launching, so no separate full
+   verification is needed immediately before it. If the old ComfyUI commit
+   remains, review tracked edits and authorize the targeted `install/comfyui.sh` revision update. It
    reuses the existing checkout/venv and does not download workflow models.
    Preserve and review local changes rather than resetting or cleaning them.
 7. A rerun of default bootstrap also reuses verified files; `--with-models` is
@@ -220,9 +223,10 @@ HTTP checks bypass proxy environment variables and stay on IPv4 loopback.
 ### Server readiness and import failures
 
 `start.sh` refuses an occupied port or a detected existing ComfyUI process for
-the same installation. It never kills an unrelated service. An import-only
-diffusers smoke check runs before the existing environment verification. After
-verification the launcher supervises its own ComfyUI process, streams output,
+the same installation. It never kills an unrelated service. The selected
+installation verification runs once and includes the diffusers import check;
+`--full` also requires the workflow model files. After verification the launcher
+supervises its own ComfyUI process, streams output,
 and retains a private startup log plus an exit/readiness status file under
 `/workspace/wan-cloud-logs`. Keep running it inside tmux. Set `COMFY_LOG_DIR` to
 another confirmed persistent location when necessary.
@@ -326,23 +330,5 @@ These checks need Python 3, Bash, curl, and wget, but no GPU or model downloads:
 python3 -m unittest discover -s tests -v
 for script in *.sh install/*.sh lib/*.sh; do bash -n "$script" || exit; done
 ```
-
-Workflow changes also require the real GitHub Actions validator (YAML parsing alone
-cannot catch context-availability errors):
-
-```bash
-./tools/install_actionlint.sh /tmp/wan-actionlint   # Pinned 1.7.12, SHA-256 verified
-export PATH="/tmp/wan-actionlint:$PATH"
-./tools/lint_workflows.sh
-```
-
-The separate **Lint GitHub Actions workflows** CI workflow runs on relevant pushes
-and pull requests, with read-only permissions and no image build or publication.
-To block invalid workflows locally **before pushing**, opt into the tracked hook:
-`git config --local core.hooksPath .githooks`. This replaces the hook-directory
-setting, so inspect any existing hooks/configuration before enabling it. The hook
-requires actionlint on PATH and fails if it is missing. No hook is enabled
-automatically. The full test suite also runs real actionlint checks when installed;
-the dedicated lint CI check always installs and requires it.
 
 The tests exercise interrupted/resumed downloads, checksum failures, existing corrupt files, bootstrap verification modes, and startup failure handling using temporary fixtures and a local HTTP server. Full installation and generation must additionally be tested on the selected RunPod template and GPU.
