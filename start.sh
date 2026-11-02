@@ -14,10 +14,11 @@ VERIFY_ARGS=(--basic)
 case "${1:-}" in
     "") ;;
     --full) VERIFY_ARGS=() ;;
-    *) log_error "Usage: $0 [--full]"; exit 1 ;;
+    --quick) VERIFY_ARGS=(--quick) ;;
+    *) log_error "Usage: $0 [--full|--quick]"; exit 1 ;;
 esac
 if [[ $# -gt 1 ]]; then
-    log_error "Usage: $0 [--full]"
+    log_error "Usage: $0 [--full|--quick]"
     exit 1
 fi
 
@@ -46,7 +47,9 @@ fi
 ########################################
 
 python3 "$SCRIPT_DIR/tools/start_comfyui.py" --directory "$COMFY_DIR" --port "$PORT" --preflight
-"$PYTHON" "$SCRIPT_DIR/tools/check_diffusers.py"
+if [[ "${1:-}" != --quick ]]; then
+    "$PYTHON" "$SCRIPT_DIR/tools/check_diffusers.py"
+fi
 
 log_info "Running installation verification..."
 echo
@@ -69,5 +72,5 @@ echo
 
 exec python3 "$SCRIPT_DIR/tools/start_comfyui.py" \
     --directory "$COMFY_DIR" --port "$PORT" \
-    --timeout "${COMFY_START_TIMEOUT:-120}" \
+    --timeout "${COMFY_START_TIMEOUT:-300}" \
     --log-dir "${COMFY_LOG_DIR:-/workspace/wan-cloud-logs}"

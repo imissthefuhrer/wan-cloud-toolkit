@@ -11,16 +11,16 @@ CUSTOM_NODES="$COMFY_DIR/custom_nodes"
 
 # Full workflow verification is the default. --basic checks the installation
 # while allowing ComfyUI to start before the large workflow models are present.
+if [[ $# -gt 1 ]]; then log_error "Expected at most one verification mode"; exit 1; fi
 CHECK_MODELS=true
+RECORD_FAST=false
 case "${1:-}" in
     "") ;;
     --basic) CHECK_MODELS=false ;;
-    *) log_error "Usage: $0 [--basic]"; exit 1 ;;
+    --quick) exec "$PYTHON" "$SCRIPT_DIR/../tools/quick_check.py" ;;
+    --record-fast) RECORD_FAST=true ;;
+    *) log_error "Usage: $0 [--basic|--quick|--record-fast]"; exit 1 ;;
 esac
-if [[ $# -gt 1 ]]; then
-    log_error "Usage: $0 [--basic]"
-    exit 1
-fi
 
 EXPECTED_COMFY_COMMIT="5d4cc3ba1b412b9acacd37fd23d59e0e1654f83c"
 
@@ -469,4 +469,9 @@ else
 
     exit 1
 
+fi
+
+# Record only after every full verification check above succeeded.
+if [[ "$RECORD_FAST" == true ]]; then
+    "$PYTHON" "$SCRIPT_DIR/../tools/quick_check.py" --record
 fi

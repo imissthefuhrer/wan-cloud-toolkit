@@ -1,0 +1,16 @@
+# Allowlist prevents secrets, models, outputs, and local venvs entering layers.
+**
+!Dockerfile
+!*.sh
+!lib/
+!lib/*.sh
+!install/
+!install/*.sh
+!tools/
+!tools/*.py
+!constraints/
+!constraints/*.txt
+!workflows/
+!workflows/Wan22-I2V-Remix.json
+!docker/
+!docker/*.sh

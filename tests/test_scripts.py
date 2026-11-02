@@ -226,7 +226,7 @@ class EntryPoints(unittest.TestCase):
                 self.assertIn("--port 8888 --preflight", calls[0])
                 self.assertIn("tools/check_diffusers.py", calls[1])
                 self.assertEqual(calls[2], verification)
-                self.assertIn("--port 8888 --timeout 120", calls[3])
+                self.assertIn("--port 8888 --timeout 300", calls[3])
 
     def test_verification_failure_prevents_start(self):
         executable(self.root / "install/verify.sh", "#!/bin/bash\nexit 9\n")

@@ -2,6 +2,21 @@
 
 Installer and launcher for a pinned ComfyUI/Wan video workflow on a **RunPod NVIDIA GPU pod**. These scripts run inside the rented pod, with persistent storage mounted at `/workspace`.
 
+## Reusable Pod image and fast startup
+
+See [the image, private template, build and first-deployment guide](docs/runpod-image.md).
+The new `Dockerfile` bakes Python 3.11, matching headers and system tools outside
+`/workspace`. It reuses the existing persistent venv/models without installing or
+downloading anything on ordinary startup. CPU-only GitHub Actions can build and
+test the image without publishing it.
+
+After first-deployment preflight and full `install/verify.sh --record-fast`, use
+`./fast-start.sh` in tmux (or template autostart) for lightweight checks followed
+by the existing supervised API/node validation, console logs and performance reports.
+The old full/basic verification and installer remain available. The startup deadline
+now defaults to 300 seconds (maximum 600), with persistent readiness diagnostics.
+The new image/fast path still requires real-Pod validation; no image has been published.
+
 ## A100 stabilization baseline
 
 The first successful **4-second video on an NVIDIA A100 80GB** was reported by
@@ -211,7 +226,7 @@ Startup succeeds only when the HTTP API responds and **all workflow node types**
 are registered. `IMPORT FAILED`, custom-node import errors, and the specific
 `module 'torch' has no attribute 'accelerator'` failure cause an explicit error.
 An unhealthy process started by this launcher is terminated; existing processes
-are left alone. `COMFY_START_TIMEOUT` defaults to 120 seconds and can be set up
+are left alone. `COMFY_START_TIMEOUT` defaults to 300 seconds and can be set up
 to 600. A log line saying the server is listening alone is insufficient.
 
 ### Automatic performance reports

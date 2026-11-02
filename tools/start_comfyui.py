@@ -34,6 +34,17 @@ def preflight(directory, port):
     check_port(port, "0.0.0.0")
 
 
+def readiness_phase(error, tail):
+    message = str(error)
+    if 'Required workflow nodes' in message:
+        return 'missing_required_nodes'
+    if isinstance(error, (RuntimeError, ValueError)):
+        return 'readiness_check_failed'
+    if 'Starting server' in tail or 'To see the GUI' in tail:
+        return 'running_http_unresponsive'
+    return 'initializing'
+
+
 def supervise(directory, port, timeout, log_dir):
     directory = Path(directory).resolve()
     preflight(directory, port)
@@ -41,6 +52,13 @@ def supervise(directory, port, timeout, log_dir):
     fd, filename = tempfile.mkstemp(prefix=time.strftime("comfy-start-%Y%m%dT%H%M%SZ-", time.gmtime()), suffix=".log", dir=log_dir)
     status = Path(filename + ".status")
     print(f"Persistent ComfyUI startup log: {filename}", flush=True)
+    diagnostic_path = Path(filename + '.readiness.jsonl')
+    try:
+        diagnostic_fd = os.open(diagnostic_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        os.close(fd)
+        raise
+    diagnostic = os.fdopen(diagnostic_fd, 'w', buffering=1)
     monitor = None
     sender = receiver = None
     monitor_log = None
@@ -76,6 +94,7 @@ def supervise(directory, port, timeout, log_dir):
     try:
         process = subprocess.Popen(command, cwd=directory, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, pass_fds=pass_fds)
     except Exception:
+        diagnostic.close()
         os.close(fd)
         if monitor is not None:
             monitor.terminate()
@@ -95,7 +114,7 @@ def supervise(directory, port, timeout, log_dir):
 
     notify({"type": "pid", "pid": process.pid})
     monitor_restarts = 0
-    state = {"tail": "", "error": None}
+    state = {"tail": "", "error": None, "last_output": time.monotonic()}
 
     def capture():
         try:
@@ -105,6 +124,7 @@ def supervise(directory, port, timeout, log_dir):
                     log.write(text)
                     print(text, end="", flush=True)
                     state["tail"] = (state["tail"] + text)[-65536:]
+                    state["last_output"] = time.monotonic()
                     failure = import_failure(state["tail"])
                     if failure:
                         state["error"] = failure
@@ -115,10 +135,24 @@ def supervise(directory, port, timeout, log_dir):
     reader.start()
     ready = False
     result = 1
+    failure_reason = ''
+    phase = 'initializing'
+    print(f'Readiness diagnostics: {diagnostic_path}; deadline: {timeout}s', flush=True)
+    started = time.monotonic()
+    next_report = started
+
     try:
         deadline = time.monotonic() + timeout
         last_error = "Waiting for ComfyUI HTTP startup"
         while True:
+            now = time.monotonic()
+            if not ready and now >= next_report:
+                report = dict(phase=phase, elapsed_seconds=round(now-started, 1),
+                              output_idle_seconds=round(now-state['last_output'], 1),
+                              last_check=last_error, pid=process.pid, port=port)
+                diagnostic.write(json.dumps(report) + '\n')
+                print(f"Startup {phase}: {report['elapsed_seconds']}s; console idle {report['output_idle_seconds']}s; {last_error}", flush=True)
+                next_report = now + 10
             if monitor is not None and monitor.poll() is not None:
                 if monitor_restarts < 3:
                     monitor_restarts += 1
@@ -150,11 +184,22 @@ def supervise(directory, port, timeout, log_dir):
                     if state["error"]:
                         raise RuntimeError(state["error"])
                     ready = True
+                    phase = 'ready'
                     print(f"ComfyUI READY on port {port}: all required workflow node types registered", flush=True)
                 except Exception as error:
                     last_error = str(error)
+                    phase = readiness_phase(error, state["tail"])
             time.sleep(.25)
+    except BaseException as error:
+        failure_reason = str(error)
+        phase = 'startup_error' if state['error'] or process.poll() is not None else phase
+        raise
     finally:
+        try:
+            diagnostic.write(json.dumps(dict(phase=phase, ready=ready, failure=failure_reason)) + '\n')
+            diagnostic.close()
+        except OSError as error:
+            print(f'Readiness diagnostic write failed: {error}', file=sys.stderr)
         stop(process)
         reader.join(timeout=5)
         process.stdout.close()
@@ -183,7 +228,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True)
     parser.add_argument("--port", type=port_number, default=8888)
-    parser.add_argument("--timeout", type=float, default=120)
+    parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--log-dir", default="/workspace/wan-cloud-logs")
     parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args()
@@ -197,7 +242,7 @@ def main():
     except KeyboardInterrupt:
         return 130
     except Exception as error:
-        print(f"ComfyUI startup failed: {error}. Inspect the persistent startup log; no unrelated service was stopped.", file=sys.stderr)
+        print(f"ComfyUI startup failed: {error}. Inspect the persistent startup log and .readiness.jsonl. Checks use local 127.0.0.1; RunPod HTTP exposure must separately map the configured port (8888 by default). No unrelated service was stopped.", file=sys.stderr)
         return 1
 
 
